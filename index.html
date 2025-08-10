@@ -1,1 +1,1515 @@
-<p>Hello world!<p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mo Cloud - Your Personal Cloud</title>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        /*=============== VARIABLES CSS ===============*/
+        :root {
+            --header-height: 3.5rem;
+            
+            /*========== Colors - Midnight & Gold Theme ==========*/
+            --primary-gold: #FFD700;
+            --gold-light: #FFED4E;
+            --gold-dark: #B8860B;
+            --midnight-deep: #0F0F23;
+            --midnight-dark: #1A1A2E;
+            --midnight-medium: #16213E;
+            --midnight-light: #1F2A44;
+            --accent-blue: #4A90E2;
+            --accent-teal: #2DD4BF;
+            --white-pure: #FFFFFF;
+            --white-soft: #F8FAFC;
+            --gray-light: #94A3B8;
+            --gray-medium: #64748B;
+            --gray-dark: #475569;
+            
+            /*========== Theme Variables ==========*/
+            --first-color: var(--primary-gold);
+            --first-color-alt: var(--gold-light);
+            --first-color-dark: var(--gold-dark);
+            --title-color: var(--white-pure);
+            --text-color: var(--gray-light);
+            --text-color-light: var(--gray-medium);
+            --body-color: var(--midnight-deep);
+            --container-color: var(--midnight-dark);
+            --surface-color: var(--midnight-medium);
+            
+            /*========== Font and typography ==========*/
+            --body-font: "Poppins", sans-serif;
+            --biggest-font-size: 2rem;
+            --h1-font-size: 1.5rem;
+            --h2-font-size: 1.25rem;
+            --h3-font-size: 1rem;
+            --normal-font-size: 0.938rem;
+            --small-font-size: 0.813rem;
+            --smaller-font-size: 0.75rem;
+            
+            /*========== Font weight ==========*/
+            --font-medium: 500;
+            --font-semibold: 600;
+            
+            /*========== z index ==========*/
+            --z-tooltip: 10;
+            --z-fixed: 100;
+            --z-modal: 1000;
+        }
+        
+        /*=============== BASE ===============*/
+        * {
+            box-sizing: border-box;
+            padding: 0;
+            margin: 0;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        body {
+            font-family: var(--body-font);
+            font-size: var(--normal-font-size);
+            background-color: var(--body-color);
+            color: var(--text-color);
+            overflow-x: hidden;
+        }
+        
+        /*=============== HEADER ===============*/
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(135deg, 
+                rgba(15, 15, 35, 0.95), 
+                rgba(26, 26, 46, 0.95));
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 215, 0, 0.1);
+            z-index: var(--z-fixed);
+            transition: 0.4s;
+        }
+        
+        .nav {
+            height: var(--header-height);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 1.5rem;
+        }
+        
+        .nav__logo {
+            color: var(--first-color);
+            font-weight: var(--font-semibold);
+            font-size: var(--h2-font-size);
+            text-decoration: none;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        }
+        
+        .nav__actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .nav__toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: none;
+            border: none;
+            color: var(--text-color);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            transition: 0.3s;
+        }
+        
+        .nav__toggle:hover {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 237, 78, 0.1));
+            color: var(--first-color);
+            transform: translateY(-2px);
+        }
+        
+        /*=============== MAIN CONTENT ===============*/
+        .main {
+            padding-top: calc(var(--header-height) + 2rem);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+        
+        /*=============== VIEW TOGGLE ===============*/
+        .view-toggle {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 2rem;
+            animation: slideInDown 0.8s ease;
+        }
+        
+        .toggle-buttons {
+            display: flex;
+            background: linear-gradient(135deg, var(--midnight-dark), var(--midnight-medium));
+            border-radius: 2rem;
+            padding: 0.25rem;
+            position: relative;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .toggle-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            background: none;
+            color: var(--text-color);
+            border-radius: 1.5rem;
+            cursor: pointer;
+            transition: 0.3s;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .toggle-btn.active {
+            color: var(--midnight-deep);
+            font-weight: var(--font-medium);
+        }
+        
+        .toggle-indicator {
+            position: absolute;
+            top: 0.25rem;
+            left: 0.25rem;
+            height: calc(100% - 0.5rem);
+            width: calc(50% - 0.25rem);
+            background: linear-gradient(135deg, var(--primary-gold), var(--gold-light));
+            border-radius: 1.5rem;
+            transition: 0.3s ease;
+            z-index: 1;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
+        }
+        
+        .toggle-indicator.organized {
+            transform: translateX(100%);
+        }
+        
+        /*=============== UPLOAD AREA ===============*/
+        .upload-section {
+            margin-bottom: 3rem;
+            animation: slideInUp 0.8s ease 0.2s both;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--first-color);
+            border-radius: 1rem;
+            padding: 3rem 2rem;
+            text-align: center;
+            background: linear-gradient(135deg, 
+                rgba(255, 215, 0, 0.05), 
+                rgba(74, 144, 226, 0.03),
+                rgba(15, 15, 35, 0.8));
+            transition: 0.3s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                transparent, 
+                rgba(255, 215, 0, 0.1), 
+                transparent);
+            transition: 0.6s;
+        }
+        
+        .upload-area:hover::before {
+            left: 100%;
+        }
+        
+        .upload-area:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 25px 50px rgba(255, 215, 0, 0.2);
+            border-color: var(--gold-light);
+            background: linear-gradient(135deg, 
+                rgba(255, 215, 0, 0.1), 
+                rgba(74, 144, 226, 0.05),
+                rgba(15, 15, 35, 0.9));
+        }
+        
+        .upload-area.dragover {
+            background: linear-gradient(135deg, 
+                rgba(255, 215, 0, 0.15), 
+                rgba(74, 144, 226, 0.08),
+                rgba(15, 15, 35, 0.9));
+            transform: scale(1.02);
+            border-color: var(--gold-light);
+            box-shadow: 0 20px 60px rgba(255, 215, 0, 0.3);
+        }
+        
+        .upload-icon {
+            font-size: 3rem;
+            color: var(--first-color);
+            margin-bottom: 1rem;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        .upload-text h3 {
+            color: var(--title-color);
+            font-size: var(--h2-font-size);
+            margin-bottom: 0.5rem;
+        }
+        
+        .upload-text p {
+            color: var(--text-color-light);
+            margin-bottom: 1rem;
+        }
+        
+        .upload-btn {
+            background: linear-gradient(135deg, var(--primary-gold), var(--gold-light));
+            color: var(--midnight-deep);
+            padding: 0.75rem 2rem;
+            border: none;
+            border-radius: 2rem;
+            cursor: pointer;
+            font-weight: var(--font-semibold);
+            transition: 0.3s;
+            box-shadow: 0 8px 25px rgba(255, 215, 0, 0.3);
+        }
+        
+        .upload-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(255, 215, 0, 0.4);
+            background: linear-gradient(135deg, var(--gold-light), var(--primary-gold));
+        }
+        
+        /*=============== FILES GRID ===============*/
+        .files-section {
+            animation: slideInUp 0.8s ease 0.4s both;
+        }
+        
+        .section-title {
+            color: var(--title-color);
+            font-size: var(--h1-font-size);
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        
+        .files-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .file-card {
+            background: linear-gradient(135deg, var(--midnight-dark), var(--midnight-medium));
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: 0.3s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            animation: slideInUp 0.6s ease both;
+            border: 1px solid rgba(255, 215, 0, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+        
+        .file-card:hover {
+            transform: translateY(-12px);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 215, 0, 0.3);
+        }
+        
+        .file-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary-gold), var(--gold-light), var(--accent-teal));
+            transform: scaleX(0);
+            transition: 0.3s;
+            border-radius: 1rem 1rem 0 0;
+        }
+        
+        .file-card:hover::before {
+            transform: scaleX(1);
+        }
+        
+        .file-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        
+        .file-icon.video { color: #FF6B9D; }
+        .file-icon.image { color: var(--accent-teal); }
+        .file-icon.pdf { color: #FF8C42; }
+        .file-icon.doc { color: var(--accent-blue); }
+        .file-icon.default { color: var(--first-color); }
+        
+        .file-info h4 {
+            color: var(--title-color);
+            font-size: var(--normal-font-size);
+            margin-bottom: 0.5rem;
+            word-break: break-word;
+        }
+        
+        .file-meta {
+            display: flex;
+            justify-content: space-between;
+            color: var(--text-color-light);
+            font-size: var(--small-font-size);
+        }
+        
+        /*=============== ORGANIZED VIEW ===============*/
+        .folders-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .folder-card {
+            background: linear-gradient(135deg, var(--midnight-dark), var(--midnight-medium));
+            border-radius: 1rem;
+            padding: 2rem 1.5rem;
+            text-align: center;
+            transition: 0.3s;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 215, 0, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+        
+        .folder-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            border-color: rgba(255, 215, 0, 0.3);
+        }
+        
+        .folder-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        
+        .folder-icon.videos { color: #FF6B9D; }
+        .folder-icon.images { color: var(--accent-teal); }
+        .folder-icon.documents { color: #FF8C42; }
+        .folder-icon.others { color: var(--first-color); }
+        
+        .folder-name {
+            color: var(--title-color);
+            font-weight: var(--font-medium);
+            margin-bottom: 0.5rem;
+        }
+        
+        .folder-count {
+            color: var(--text-color-light);
+            font-size: var(--small-font-size);
+        }
+        
+        /*=============== AUTH MODAL ===============*/
+        .auth-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 15, 35, 0.95);
+            backdrop-filter: blur(20px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: var(--z-modal);
+            opacity: 0;
+            visibility: hidden;
+            transition: 0.3s;
+        }
+
+        .auth-modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .auth-modal-content {
+            background: linear-gradient(135deg, var(--midnight-dark), var(--midnight-medium));
+            border-radius: 1.5rem;
+            padding: 3rem;
+            width: 90%;
+            max-width: 400px;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            transform: translateY(30px);
+            transition: 0.3s;
+        }
+
+        .auth-modal.show .auth-modal-content {
+            transform: translateY(0);
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .auth-header h2 {
+            color: var(--title-color);
+            font-size: var(--h1-font-size);
+            margin-bottom: 0.5rem;
+        }
+
+        .auth-header p {
+            color: var(--text-color);
+            font-size: var(--small-font-size);
+        }
+
+        .auth-tabs {
+            display: flex;
+            background: var(--surface-color);
+            border-radius: 1rem;
+            padding: 0.25rem;
+            margin-bottom: 2rem;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            background: none;
+            color: var(--text-color);
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: 0.3s;
+            font-weight: var(--font-medium);
+        }
+
+        .auth-tab.active {
+            background: linear-gradient(135deg, var(--primary-gold), var(--gold-light));
+            color: var(--midnight-deep);
+        }
+
+        .auth-form {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 1rem;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            border-radius: 0.5rem;
+            background: var(--surface-color);
+            color: var(--title-color);
+            font-size: var(--normal-font-size);
+            transition: 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-gold);
+            box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.2);
+        }
+
+        .form-group input::placeholder {
+            color: var(--text-color-light);
+        }
+
+        .auth-btn {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: var(--font-medium);
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .auth-btn.primary {
+            background: linear-gradient(135deg, var(--primary-gold), var(--gold-light));
+            color: var(--midnight-deep);
+        }
+
+        .auth-btn.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 215, 0, 0.3);
+        }
+
+        .auth-btn.google {
+            background: var(--surface-color);
+            color: var(--title-color);
+            border: 1px solid rgba(255, 215, 0, 0.2);
+        }
+
+        .auth-btn.google:hover {
+            border-color: var(--primary-gold);
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        .auth-divider {
+            text-align: center;
+            margin: 1.5rem 0;
+            position: relative;
+        }
+
+        .auth-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: rgba(255, 215, 0, 0.2);
+        }
+
+        .auth-divider span {
+            background: var(--midnight-dark);
+            padding: 0 1rem;
+            color: var(--text-color-light);
+            font-size: var(--small-font-size);
+        }
+
+        .auth-error {
+            display: none;
+            color: #ff6b6b;
+            font-size: var(--small-font-size);
+            margin-top: 0.5rem;
+            text-align: center;
+        }
+        
+        /*=============== LOADING STATES ===============*/
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 3rem;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 215, 0, 0.2);
+            border-top: 3px solid var(--first-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        /*=============== ANIMATIONS ===============*/
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /*=============== HIDDEN STATE ===============*/
+        .hidden {
+            display: none;
+        }
+        
+        /*=============== RESPONSIVE ===============*/
+        @media screen and (max-width: 768px) {
+            .nav {
+                padding: 0 1rem;
+            }
+            
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .upload-area {
+                padding: 2rem 1rem;
+            }
+            
+            .files-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .folders-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .auth-modal-content {
+                margin: 1rem;
+                padding: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <nav class="nav">
+            <a href="#" class="nav__logo">
+                <i class="fas fa-cloud"></i> Mo Cloud
+            </a>
+            <div class="nav__actions">
+                <button class="nav__toggle" id="userMenu">
+                    <i class="fas fa-user"></i>
+                    <span id="userEmail">Account</span>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- View Toggle -->
+            <div class="view-toggle">
+                <div class="toggle-buttons">
+                    <div class="toggle-indicator" id="toggleIndicator"></div>
+                    <button class="toggle-btn active" data-view="recent">
+                        <i class="fas fa-clock"></i> Recent
+                    </button>
+                    <button class="toggle-btn" data-view="organized">
+                        <i class="fas fa-folder"></i> Organized
+                    </button>
+                </div>
+            </div>
+
+            <!-- Upload Section -->
+            <section class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                    <div class="upload-text">
+                        <h3>Drop files here to upload</h3>
+                        <p>or click to browse your device</p>
+                        <button class="upload-btn">Choose Files</button>
+                    </div>
+                    <input type="file" id="fileInput" multiple style="display: none;">
+                </div>
+            </section>
+
+            <!-- Files Content -->
+            <section class="files-section">
+                <!-- Recent View -->
+                <div id="recentView">
+                    <h2 class="section-title">Recent Files</h2>
+                    <div class="files-grid" id="recentFiles">
+                        <!-- Sample files for demo -->
+                        <div class="file-card" style="animation-delay: 0.1s;" data-sample>
+                            <i class="fas fa-play-circle file-icon video"></i>
+                            <div class="file-info">
+                                <h4>Summer_Vacation.mp4</h4>
+                                <div class="file-meta">
+                                    <span>25.4 MB</span>
+                                    <span>2 hours ago</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="file-card" style="animation-delay: 0.2s;" data-sample>
+                            <i class="fas fa-file-pdf file-icon pdf"></i>
+                            <div class="file-info">
+                                <h4>Project_Report.pdf</h4>
+                                <div class="file-meta">
+                                    <span>1.2 MB</span>
+                                    <span>1 day ago</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="file-card" style="animation-delay: 0.3s;" data-sample>
+                            <i class="fas fa-image file-icon image"></i>
+                            <div class="file-info">
+                                <h4>Screenshot_2024.png</h4>
+                                <div class="file-meta">
+                                    <span>856 KB</span>
+                                    <span>3 days ago</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Organized View -->
+                <div id="organizedView" class="hidden">
+                    <h2 class="section-title">Your Files</h2>
+                    <div class="folders-grid">
+                        <div class="folder-card">
+                            <i class="fas fa-video folder-icon videos"></i>
+                            <div class="folder-name">Videos</div>
+                            <div class="folder-count">12 files</div>
+                        </div>
+                        
+                        <div class="folder-card">
+                            <i class="fas fa-images folder-icon images"></i>
+                            <div class="folder-name">Images</div>
+                            <div class="folder-count">45 files</div>
+                        </div>
+                        
+                        <div class="folder-card">
+                            <i class="fas fa-file-alt folder-icon documents"></i>
+                            <div class="folder-name">Documents</div>
+                            <div class="folder-count">23 files</div>
+                        </div>
+                        
+                        <div class="folder-card">
+                            <i class="fas fa-folder folder-icon others"></i>
+                            <div class="folder-name">Others</div>
+                            <div class="folder-count">8 files</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+        
+        // Configuration
+        const CONFIG = {
+            b2: {
+                applicationKeyId: '0050a27238881a10000000001',
+                applicationKey: 'K0059KSIh9IHtNfHfdoug34H7MA8ArA',
+                bucketName: 'Mo_cloud'
+            },
+            firebase: {
+                apiKey: "AIzaSyB-lfjFsR7QjAPEMOHjzWn-ynypzK5QX1c",
+                authDomain: "mocloud-c74e6.firebaseapp.com",
+                projectId: "mocloud-c74e6",
+                storageBucket: "mocloud-c74e6.firebasestorage.app",
+                messagingSenderId: "868237224904",
+                appId: "1:868237224904:web:3c161e9092118bff4ceefd",
+                measurementId: "G-SRFKZDV3DC"
+            }
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(CONFIG.firebase);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const googleProvider = new GoogleAuthProvider();
+        
+        window.db = db;
+        window.auth = auth;
+
+        // Authentication Manager
+        class AuthManager {
+            constructor() {
+                this.currentUser = null;
+                this.setupAuthListener();
+            }
+
+            setupAuthListener() {
+                onAuthStateChanged(auth, (user) => {
+                    this.currentUser = user;
+                    if (user) {
+                        console.log('User signed in:', user.email);
+                        this.hideAuthModal();
+                        window.fileManager?.initialize();
+                        this.updateUserDisplay(user);
+                    } else {
+                        console.log('User signed out');
+                        this.showAuthModal();
+                        this.updateUserDisplay(null);
+                    }
+                });
+            }
+
+            updateUserDisplay(user) {
+                const userEmailEl = document.getElementById('userEmail');
+                if (user && userEmailEl) {
+                    const email = user.email;
+                    const displayEmail = email.length > 15 ? email.substring(0, 12) + '...' : email;
+                    userEmailEl.textContent = displayEmail;
+                } else if (userEmailEl) {
+                    userEmailEl.textContent = 'Account';
+                }
+            }
+
+            async signInWithEmail(email, password) {
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                    return { success: true };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            }
+
+            async signUpWithEmail(email, password) {
+                try {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                    return { success: true };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            }
+
+            async signInWithGoogle() {
+                try {
+                    await signInWithPopup(auth, googleProvider);
+                    return { success: true };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            }
+
+            async signOut() {
+                try {
+                    await signOut(auth);
+                    return { success: true };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            }
+
+            showAuthModal() {
+                const existingModal = document.getElementById('authModal');
+                if (existingModal) return;
+
+                const modal = document.createElement('div');
+                modal.id = 'authModal';
+                modal.className = 'auth-modal';
+                modal.innerHTML = `
+                    <div class="auth-modal-content">
+                        <div class="auth-header">
+                            <h2>Welcome to Mo Cloud</h2>
+                            <p>Sign in to access your private cloud storage</p>
+                        </div>
+                        
+                        <div class="auth-tabs">
+                            <button class="auth-tab active" data-tab="signin">Sign In</button>
+                            <button class="auth-tab" data-tab="signup">Sign Up</button>
+                        </div>
+
+                        <form id="signinForm" class="auth-form">
+                            <div class="form-group">
+                                <input type="email" id="signinEmail" placeholder="Email" required>
+                            </div>
+                            <div class="form-group">
+                                <input type="password" id="signinPassword" placeholder="Password" required>
+                            </div>
+                            <button type="submit" class="auth-btn primary">Sign In</button>
+                            <div class="auth-error" id="signinError"></div>
+                        </form>
+
+                        <form id="signupForm" class="auth-form hidden">
+                            <div class="form-group">
+                                <input type="email" id="signupEmail" placeholder="Email" required>
+                            </div>
+                            <div class="form-group">
+                                <input type="password" id="signupPassword" placeholder="Password (min 6 characters)" required minlength="6">
+                            </div>
+                            <button type="submit" class="auth-btn primary">Create Account</button>
+                            <div class="auth-error" id="signupError"></div>
+                        </form>
+
+                        <div class="auth-divider">
+                            <span>or</span>
+                        </div>
+
+                        <button id="googleSignIn" class="auth-btn google">
+                            <i class="fab fa-google"></i>
+                            Continue with Google
+                        </button>
+                    </div>
+                `;
+
+                document.body.appendChild(modal);
+                this.setupAuthModalEvents();
+                
+                // Animate in
+                setTimeout(() => modal.classList.add('show'), 10);
+            }
+
+            hideAuthModal() {
+                const modal = document.getElementById('authModal');
+                if (modal) {
+                    modal.classList.remove('show');
+                    setTimeout(() => modal.remove(), 300);
+                }
+            }
+
+            setupAuthModalEvents() {
+                // Tab switching
+                document.querySelectorAll('.auth-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        const tabName = tab.dataset.tab;
+                        
+                        // Update active tab
+                        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        
+                        // Show/hide forms
+                        document.getElementById('signinForm').classList.toggle('hidden', tabName !== 'signin');
+                        document.getElementById('signupForm').classList.toggle('hidden', tabName !== 'signup');
+                    });
+                });
+
+                // Sign in form
+                document.getElementById('signinForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const email = document.getElementById('signinEmail').value;
+                    const password = document.getElementById('signinPassword').value;
+                    const errorEl = document.getElementById('signinError');
+                    
+                    const result = await this.signInWithEmail(email, password);
+                    if (!result.success) {
+                        errorEl.textContent = result.error;
+                        errorEl.style.display = 'block';
+                    }
+                });
+
+                // Sign up form
+                document.getElementById('signupForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const email = document.getElementById('signupEmail').value;
+                    const password = document.getElementById('signupPassword').value;
+                    const errorEl = document.getElementById('signupError');
+                    
+                    const result = await this.signUpWithEmail(email, password);
+                    if (!result.success) {
+                        errorEl.textContent = result.error;
+                        errorEl.style.display = 'block';
+                    }
+                });
+
+                // Google sign in
+                document.getElementById('googleSignIn').addEventListener('click', async () => {
+                    await this.signInWithGoogle();
+                });
+            }
+        }
+
+        // Encryption Module
+        class EncryptionManager {
+            constructor(userId) {
+                this.userId = userId;
+                this.encryptionKey = null;
+            }
+
+            async generateUserKey() {
+                const encoder = new TextEncoder();
+                const keyMaterial = await crypto.subtle.importKey(
+                    'raw',
+                    encoder.encode(this.userId),
+                    'PBKDF2',
+                    false,
+                    ['deriveBits', 'deriveKey']
+                );
+
+                const salt = await crypto.subtle.digest('SHA-256', encoder.encode(this.userId));
+                
+                this.encryptionKey = await crypto.subtle.deriveKey(
+                    {
+                        name: 'PBKDF2',
+                        salt: salt,
+                        iterations: 100000,
+                        hash: 'SHA-256'
+                    },
+                    keyMaterial,
+                    { name: 'AES-GCM', length: 256 },
+                    false,
+                    ['encrypt', 'decrypt']
+                );
+
+                return true;
+            }
+
+            async encryptFile(file) {
+                if (!this.encryptionKey) {
+                    await this.generateUserKey();
+                }
+
+                const fileBuffer = await file.arrayBuffer();
+                const iv = crypto.getRandomValues(new Uint8Array(12));
+                
+                const encryptedData = await crypto.subtle.encrypt(
+                    { name: 'AES-GCM', iv: iv },
+                    this.encryptionKey,
+                    fileBuffer
+                );
+
+                const combined = new Uint8Array(iv.length + encryptedData.byteLength);
+                combined.set(iv);
+                combined.set(new Uint8Array(encryptedData), iv.length);
+
+                return combined;
+            }
+
+            async decryptFile(encryptedData) {
+                if (!this.encryptionKey) {
+                    await this.generateUserKey();
+                }
+
+                const iv = encryptedData.slice(0, 12);
+                const encrypted = encryptedData.slice(12);
+
+                const decryptedData = await crypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv: iv },
+                    this.encryptionKey,
+                    encrypted
+                );
+
+                return decryptedData;
+            }
+        }
+
+        // B2 Storage Manager
+        class B2StorageManager {
+            constructor() {
+                this.authToken = null;
+                this.apiUrl = null;
+                this.downloadUrl = null;
+                this.bucketId = null;
+            }
+
+            async authenticate() {
+                const credentials = btoa(`${CONFIG.b2.applicationKeyId}:${CONFIG.b2.applicationKey}`);
+                
+                try {
+                    const response = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Basic ${credentials}`
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`B2 Authentication failed: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    this.authToken = data.authorizationToken;
+                    this.apiUrl = data.apiUrl;
+                    this.downloadUrl = data.downloadUrl;
+
+                    await this.getBucketInfo();
+                    return true;
+                } catch (error) {
+                    console.error('B2 Authentication error:', error);
+                    return false;
+                }
+            }
+
+            async getBucketInfo() {
+                try {
+                    const response = await fetch(`${this.apiUrl}/b2api/v2/b2_list_buckets`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': this.authToken,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            accountId: CONFIG.b2.applicationKeyId.substring(0, 12)
+                        })
+                    });
+
+                    const data = await response.json();
+                    const bucket = data.buckets.find(b => b.bucketName === CONFIG.b2.bucketName);
+                    if (bucket) {
+                        this.bucketId = bucket.bucketId;
+                    } else {
+                        throw new Error(`Bucket ${CONFIG.b2.bucketName} not found`);
+                    }
+                } catch (error) {
+                    console.error('Error getting bucket info:', error);
+                    throw error;
+                }
+            }
+
+            async getUploadUrl() {
+                try {
+                    const response = await fetch(`${this.apiUrl}/b2api/v2/b2_get_upload_url`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': this.authToken,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            bucketId: this.bucketId
+                        })
+                    });
+
+                    return await response.json();
+                } catch (error) {
+                    console.error('Error getting upload URL:', error);
+                    throw error;
+                }
+            }
+
+            async uploadFile(encryptedData, fileName) {
+                try {
+                    const uploadInfo = await this.getUploadUrl();
+                    const sha1Hash = await this.calculateSHA1(encryptedData);
+
+                    const response = await fetch(uploadInfo.uploadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': uploadInfo.authorizationToken,
+                            'X-Bz-File-Name': encodeURIComponent(fileName),
+                            'Content-Type': 'application/octet-stream',
+                            'X-Bz-Content-Sha1': sha1Hash,
+                            'X-Bz-Info-src_last_modified_millis': Date.now().toString()
+                        },
+                        body: encryptedData
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Upload failed: ${response.status}`);
+                    }
+
+                    return await response.json();
+                } catch (error) {
+                    console.error('Error uploading file:', error);
+                    throw error;
+                }
+            }
+
+            async calculateSHA1(data) {
+                const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            }
+        }
+
+        // File Manager
+        class FileManager {
+            constructor() {
+                this.encryptionManager = null;
+                this.storageManager = new B2StorageManager();
+                this.files = [];
+            }
+
+            async initialize() {
+                const user = auth.currentUser;
+                if (!user) {
+                    console.log('No user logged in');
+                    return false;
+                }
+
+                this.encryptionManager = new EncryptionManager(user.uid);
+                await this.encryptionManager.generateUserKey();
+
+                const b2Success = await this.storageManager.authenticate();
+                if (!b2Success) {
+                    alert('Failed to connect to storage. Please check your internet connection.');
+                    return false;
+                }
+
+                await this.loadFiles();
+                return true;
+            }
+
+            async uploadFile(file) {
+                const user = auth.currentUser;
+                if (!user) {
+                    alert('Please sign in to upload files');
+                    return;
+                }
+
+                try {
+                    console.log(`Uploading: ${file.name}`);
+                    
+                    const encryptedData = await this.encryptionManager.encryptFile(file);
+                    const fileId = this.generateFileId();
+                    const encryptedFileName = `${user.uid}/${fileId}.enc`;
+
+                    const uploadResult = await this.storageManager.uploadFile(encryptedData, encryptedFileName);
+
+                    const fileMetadata = {
+                        id: fileId,
+                        userId: user.uid,
+                        originalName: file.name,
+                        size: file.size,
+                        type: file.type,
+                        uploadDate: new Date(),
+                        b2FileId: uploadResult.fileId,
+                        b2FileName: uploadResult.fileName,
+                        folder: this.determineFolder(file.type)
+                    };
+
+                    await addDoc(collection(db, 'files'), fileMetadata);
+
+                    this.files.unshift(fileMetadata);
+                    this.refreshFileDisplay();
+
+                    console.log(`Upload complete: ${file.name}`);
+                    return fileMetadata;
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    alert(`Upload failed: ${error.message}`);
+                    throw error;
+                }
+            }
+
+            async loadFiles() {
+                const user = auth.currentUser;
+                if (!user) return;
+
+                try {
+                    const q = query(
+                        collection(db, 'files'), 
+                        where('userId', '==', user.uid),
+                        orderBy('uploadDate', 'desc')
+                    );
+                    const querySnapshot = await getDocs(q);
+                    
+                    this.files = [];
+                    querySnapshot.forEach((doc) => {
+                        this.files.push({ id: doc.id, ...doc.data() });
+                    });
+
+                    this.refreshFileDisplay();
+                } catch (error) {
+                    console.error('Error loading files:', error);
+                }
+            }
+
+            refreshFileDisplay() {
+                const recentFiles = document.getElementById('recentFiles');
+                
+                const existingCards = recentFiles.querySelectorAll('.file-card:not([data-sample])');
+                existingCards.forEach(card => card.remove());
+
+                this.files.forEach((file, index) => {
+                    const fileCard = this.createFileCard(file, index);
+                    recentFiles.appendChild(fileCard);
+                });
+            }
+
+            createFileCard(file, index) {
+                const fileCard = document.createElement('div');
+                fileCard.className = 'file-card';
+                fileCard.style.animationDelay = `${index * 0.1}s`;
+                
+                const fileIcon = this.getFileIcon(file.type);
+                const fileSize = this.formatFileSize(file.size);
+                const timeAgo = this.getTimeAgo(file.uploadDate);
+                
+                fileCard.innerHTML = `
+                    <i class="${fileIcon.class} file-icon ${fileIcon.type}"></i>
+                    <div class="file-info">
+                        <h4>${file.originalName}</h4>
+                        <div class="file-meta">
+                            <span>${fileSize}</span>
+                            <span>${timeAgo}</span>
+                        </div>
+                    </div>
+                `;
+                
+                fileCard.addEventListener('click', () => {
+                    this.openFile(file);
+                });
+                
+                return fileCard;
+            }
+
+            async openFile(file) {
+                alert(`File viewer coming soon! File: ${file.originalName}`);
+            }
+
+            generateFileId() {
+                return Date.now().toString(36) + Math.random().toString(36).substr(2);
+            }
+
+            determineFolder(mimeType) {
+                if (mimeType.startsWith('video/')) return 'videos';
+                if (mimeType.startsWith('image/')) return 'images';
+                if (mimeType === 'application/pdf') return 'documents';
+                if (mimeType.includes('document') || mimeType.includes('word') || mimeType.includes('text')) return 'documents';
+                return 'others';
+            }
+
+            getFileIcon(mimeType) {
+                if (mimeType.startsWith('video/')) {
+                    return { class: 'fas fa-play-circle', type: 'video' };
+                } else if (mimeType.startsWith('image/')) {
+                    return { class: 'fas fa-image', type: 'image' };
+                } else if (mimeType === 'application/pdf') {
+                    return { class: 'fas fa-file-pdf', type: 'pdf' };
+                } else if (mimeType.includes('document') || mimeType.includes('word')) {
+                    return { class: 'fas fa-file-word', type: 'doc' };
+                } else {
+                    return { class: 'fas fa-file', type: 'default' };
+                }
+            }
+
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+            }
+
+            getTimeAgo(date) {
+                if (!date) return 'Unknown';
+                
+                const now = new Date();
+                const uploadDate = date.toDate ? date.toDate() : new Date(date);
+                const diffMs = now - uploadDate;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffMs / 86400000);
+
+                if (diffMins < 1) return 'Just now';
+                if (diffMins < 60) return `${diffMins}m ago`;
+                if (diffHours < 24) return `${diffHours}h ago`;
+                return `${diffDays}d ago`;
+            }
+        }
+
+        // Initialize the application
+        window.authManager = new AuthManager();
+        window.fileManager = new FileManager();
+    </script>
+
+    <script>
+        // DOM Event Handlers
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM Elements
+            const toggleButtons = document.querySelectorAll('.toggle-btn');
+            const toggleIndicator = document.getElementById('toggleIndicator');
+            const recentView = document.getElementById('recentView');
+            const organizedView = document.getElementById('organizedView');
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+
+            // View Toggle Functionality
+            toggleButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const view = button.dataset.view;
+                    
+                    toggleButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    if (view === 'organized') {
+                        toggleIndicator.classList.add('organized');
+                        recentView.classList.add('hidden');
+                        organizedView.classList.remove('hidden');
+                    } else {
+                        toggleIndicator.classList.remove('organized');
+                        organizedView.classList.add('hidden');
+                        recentView.classList.remove('hidden');
+                    }
+                });
+            });
+
+            // Upload Area Functionality
+            if (uploadArea) {
+                uploadArea.addEventListener('click', () => {
+                    fileInput.click();
+                });
+
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.add('dragover');
+                });
+
+                uploadArea.addEventListener('dragleave', () => {
+                    uploadArea.classList.remove('dragover');
+                });
+
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.remove('dragover');
+                    
+                    const files = Array.from(e.dataTransfer.files);
+                    handleFileUpload(files);
+                });
+            }
+
+            if (fileInput) {
+                fileInput.addEventListener('change', (e) => {
+                    const files = Array.from(e.target.files);
+                    handleFileUpload(files);
+                });
+            }
+
+            // User menu functionality  
+            const userMenu = document.getElementById('userMenu');
+            if (userMenu) {
+                userMenu.addEventListener('click', async () => {
+                    if (window.auth && window.auth.currentUser) {
+                        const confirmSignOut = confirm('Sign out of Mo Cloud?');
+                        if (confirmSignOut) {
+                            await window.authManager.signOut();
+                        }
+                    }
+                });
+            }
+        });
+
+        // File Upload Handler
+        async function handleFileUpload(files) {
+            console.log('Files to upload:', files);
+            
+            if (!window.fileManager) {
+                alert('Please sign in to upload files');
+                return;
+            }
+
+            if (!window.auth.currentUser) {
+                alert('Please sign in to upload files');
+                return;
+            }
+
+            for (const file of files) {
+                try {
+                    await window.fileManager.uploadFile(file);
+                } catch (error) {
+                    console.error(`Failed to upload ${file.name}:`, error);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
