@@ -1492,7 +1492,6 @@
                 
                 foldersGrid.appendChild(allFilesCard);
             }
-            }
 
             filterFilesByFolder(folderType) {
                 console.log(`Filtering files by folder: ${folderType}`);
@@ -1835,6 +1834,9 @@
                         if (confirmSignOut) {
                             await window.authManager.signOut();
                         }
+                    } else {
+                        // If not signed in, manually show auth modal
+                        window.authManager.showAuthModal();
                     }
                 });
             }
