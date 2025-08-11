@@ -1,4 +1,5 @@
 // netlify/functions/b2-auth.js
+
 exports.handler = async (event, context) => {
     // Only allow POST requests
     if (event.httpMethod !== 'POST') {
@@ -37,7 +38,7 @@ exports.handler = async (event, context) => {
       switch (action) {
         case 'authorize':
           // B2 Account Authorization
-          const credentials = Buffer.from(`${B2_APPLICATION_KEY_ID}:${B2_APPLICATION_KEY}`).toString('base64');
+          const credentials = Buffer.from(`${B2_APPLICATION_KEY_ID}:${B2_APPLICATION_KEY}`, 'utf8').toString('base64');
           
           response = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
             method: 'GET',
