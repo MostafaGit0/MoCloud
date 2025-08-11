@@ -815,10 +815,9 @@
         
         // Configuration
         const CONFIG = {
-            b2: {
-                applicationKeyId: '0050a27238881a10000000001',
-                applicationKey: 'K0059KSIh9IHtNfHfdoug34H7MA8ArA',
-                bucketName: 'Mo_cloud'
+            supabase: {
+                url: 'https://nkmzhutadrhvaiqysvcl.supabase.co',
+                anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rbXpodXRhZHJodmFpcXlzdmNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ4NzYwOTksImV4cCI6MjA3MDQ1MjA5OX0.sukXvnxVsAIit40GRr6pXFIsqXU0AUeYF2IpM4YxMFE'
             },
             firebase: {
                 apiKey: "AIzaSyB-lfjFsR7QjAPEMOHjzWn-ynypzK5QX1c",
@@ -1102,101 +1101,95 @@
             }
         }
 
-        // B2 Storage Manager (Using Netlify Functions)
-        class B2StorageManager {
+        // Supabase Storage Manager
+        class SupabaseStorageManager {
             constructor() {
-                this.authToken = null;
-                this.apiUrl = null;
-                this.downloadUrl = null;
-                this.bucketId = null;
-                this.functionsUrl = 'https://mocloudapp.netlify.app/.netlify/functions';
+                this.supabaseUrl = CONFIG.supabase.url;
+                this.supabaseKey = CONFIG.supabase.anonKey;
+                this.bucketName = 'files';
             }
 
-            async authenticate() {
+            async uploadFile(encryptedData, fileName, userId) {
                 try {
-                    const response = await fetch(`${this.functionsUrl}/b2-auth`, {
+                    console.log(`Uploading ${fileName} to Supabase...`);
+                    
+                    // Create file path with user folder
+                    const filePath = `${userId}/${fileName}`;
+                    
+                    // Upload to Supabase Storage
+                    const response = await fetch(`${this.supabaseUrl}/storage/v1/object/${this.bucketName}/${filePath}`, {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ action: 'authorize' })
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`Function authentication failed: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    this.authToken = data.authorizationToken;
-                    this.apiUrl = data.apiUrl;
-                    this.downloadUrl = data.downloadUrl;
-                    this.bucketId = data.bucketId;
-
-                    return true;
-                } catch (error) {
-                    console.error('B2 Authentication error:', error);
-                    return false;
-                }
-            }
-
-            async getUploadUrl() {
-                try {
-                    const response = await fetch(`${this.functionsUrl}/b2-auth`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            action: 'getUploadUrl',
-                            authToken: this.authToken,
-                            apiUrl: this.apiUrl,
-                            bucketId: this.bucketId
-                        })
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`Get upload URL failed: ${response.status}`);
-                    }
-
-                    return await response.json();
-                } catch (error) {
-                    console.error('Error getting upload URL:', error);
-                    throw error;
-                }
-            }
-
-            async uploadFile(encryptedData, fileName) {
-                try {
-                    const uploadInfo = await this.getUploadUrl();
-                    const sha1Hash = await this.calculateSHA1(encryptedData);
-
-                    const response = await fetch(uploadInfo.uploadUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': uploadInfo.authorizationToken,
-                            'X-Bz-File-Name': encodeURIComponent(fileName),
+                            'Authorization': `Bearer ${this.supabaseKey}`,
                             'Content-Type': 'application/octet-stream',
-                            'X-Bz-Content-Sha1': sha1Hash,
-                            'X-Bz-Info-src_last_modified_millis': Date.now().toString()
+                            'x-upsert': 'true' // Allow overwrite if file exists
                         },
                         body: encryptedData
                     });
 
                     if (!response.ok) {
-                        throw new Error(`Upload failed: ${response.status}`);
+                        const errorText = await response.text();
+                        console.error('Supabase upload error:', errorText);
+                        throw new Error(`Upload failed: ${response.status} - ${errorText}`);
                     }
 
-                    return await response.json();
+                    const result = await response.json();
+                    console.log('Upload successful:', result);
+
+                    return {
+                        path: filePath,
+                        fullPath: result.Key || filePath,
+                        id: result.Id || fileName
+                    };
                 } catch (error) {
-                    console.error('Error uploading file:', error);
+                    console.error('Error uploading to Supabase:', error);
                     throw error;
                 }
             }
 
-            async calculateSHA1(data) {
-                const hashBuffer = await crypto.subtle.digest('SHA-1', data);
-                const hashArray = Array.from(new Uint8Array(hashBuffer));
-                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            async downloadFile(filePath) {
+                try {
+                    console.log(`Downloading ${filePath} from Supabase...`);
+                    
+                    const response = await fetch(`${this.supabaseUrl}/storage/v1/object/${this.bucketName}/${filePath}`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${this.supabaseKey}`
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Download failed: ${response.status}`);
+                    }
+
+                    const arrayBuffer = await response.arrayBuffer();
+                    return new Uint8Array(arrayBuffer);
+                } catch (error) {
+                    console.error('Error downloading from Supabase:', error);
+                    throw error;
+                }
+            }
+
+            async deleteFile(filePath) {
+                try {
+                    console.log(`Deleting ${filePath} from Supabase...`);
+                    
+                    const response = await fetch(`${this.supabaseUrl}/storage/v1/object/${this.bucketName}/${filePath}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${this.supabaseKey}`
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Delete failed: ${response.status}`);
+                    }
+
+                    return true;
+                } catch (error) {
+                    console.error('Error deleting from Supabase:', error);
+                    throw error;
+                }
             }
         }
 
@@ -1204,7 +1197,7 @@
         class FileManager {
             constructor() {
                 this.encryptionManager = null;
-                this.storageManager = new B2StorageManager();
+                this.storageManager = new SupabaseStorageManager();
                 this.files = [];
             }
 
@@ -1215,15 +1208,11 @@
                     return false;
                 }
 
+                // Initialize encryption with user ID
                 this.encryptionManager = new EncryptionManager(user.uid);
                 await this.encryptionManager.generateUserKey();
 
-                const b2Success = await this.storageManager.authenticate();
-                if (!b2Success) {
-                    alert('Failed to connect to storage. Please check your internet connection.');
-                    return false;
-                }
-
+                // Load existing files for this user
                 await this.loadFiles();
                 return true;
             }
@@ -1238,12 +1227,17 @@
                 try {
                     console.log(`Uploading: ${file.name}`);
                     
+                    // Encrypt file
                     const encryptedData = await this.encryptionManager.encryptFile(file);
+                    
+                    // Generate unique file ID and path
                     const fileId = this.generateFileId();
-                    const encryptedFileName = `${user.uid}/${fileId}.enc`;
+                    const encryptedFileName = `${fileId}.enc`;
 
-                    const uploadResult = await this.storageManager.uploadFile(encryptedData, encryptedFileName);
+                    // Upload to Supabase
+                    const uploadResult = await this.storageManager.uploadFile(encryptedData, encryptedFileName, user.uid);
 
+                    // Save metadata to Firestore
                     const fileMetadata = {
                         id: fileId,
                         userId: user.uid,
@@ -1251,13 +1245,13 @@
                         size: file.size,
                         type: file.type,
                         uploadDate: new Date(),
-                        b2FileId: uploadResult.fileId,
-                        b2FileName: uploadResult.fileName,
+                        storagePath: uploadResult.path,
                         folder: this.determineFolder(file.type)
                     };
 
                     await addDoc(collection(db, 'files'), fileMetadata);
 
+                    // Add to local files array and refresh UI
                     this.files.unshift(fileMetadata);
                     this.refreshFileDisplay();
 
@@ -1267,6 +1261,59 @@
                     console.error('Upload error:', error);
                     alert(`Upload failed: ${error.message}`);
                     throw error;
+                }
+            }
+
+            async downloadFile(fileMetadata) {
+                try {
+                    console.log(`Downloading: ${fileMetadata.originalName}`);
+                    
+                    // Download encrypted file from Supabase
+                    const encryptedData = await this.storageManager.downloadFile(fileMetadata.storagePath);
+                    
+                    // Decrypt the file
+                    const decryptedData = await this.encryptionManager.decryptFile(encryptedData);
+                    
+                    // Create blob and download
+                    const blob = new Blob([decryptedData], { type: fileMetadata.type });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileMetadata.originalName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    console.log(`Download complete: ${fileMetadata.originalName}`);
+                } catch (error) {
+                    console.error('Download error:', error);
+                    alert(`Download failed: ${error.message}`);
+                }
+            }
+
+            async deleteFile(fileMetadata) {
+                try {
+                    const confirmDelete = confirm(`Delete ${fileMetadata.originalName}?`);
+                    if (!confirmDelete) return;
+                    
+                    console.log(`Deleting: ${fileMetadata.originalName}`);
+                    
+                    // Delete from Supabase
+                    await this.storageManager.deleteFile(fileMetadata.storagePath);
+                    
+                    // Delete from Firestore
+                    await deleteDoc(doc(db, 'files', fileMetadata.id));
+                    
+                    // Remove from local array and refresh UI
+                    this.files = this.files.filter(f => f.id !== fileMetadata.id);
+                    this.refreshFileDisplay();
+                    
+                    console.log(`Delete complete: ${fileMetadata.originalName}`);
+                } catch (error) {
+                    console.error('Delete error:', error);
+                    alert(`Delete failed: ${error.message}`);
                 }
             }
 
@@ -1323,8 +1370,40 @@
                             <span>${timeAgo}</span>
                         </div>
                     </div>
+                    <div class="file-actions" style="position: absolute; top: 1rem; right: 1rem; opacity: 0; transition: 0.3s;">
+                        <button class="download-btn" style="background: var(--accent-teal); color: white; border: none; padding: 0.5rem; border-radius: 0.25rem; margin-right: 0.5rem; cursor: pointer;">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="delete-btn" style="background: #ff6b6b; color: white; border: none; padding: 0.5rem; border-radius: 0.25rem; cursor: pointer;">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 `;
                 
+                // Show actions on hover
+                fileCard.addEventListener('mouseenter', () => {
+                    const actions = fileCard.querySelector('.file-actions');
+                    actions.style.opacity = '1';
+                });
+                
+                fileCard.addEventListener('mouseleave', () => {
+                    const actions = fileCard.querySelector('.file-actions');
+                    actions.style.opacity = '0';
+                });
+                
+                // Download button
+                fileCard.querySelector('.download-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.downloadFile(file);
+                });
+                
+                // Delete button
+                fileCard.querySelector('.delete-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.deleteFile(file);
+                });
+                
+                // Open file on card click
                 fileCard.addEventListener('click', () => {
                     this.openFile(file);
                 });
