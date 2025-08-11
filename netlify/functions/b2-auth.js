@@ -1,18 +1,8 @@
 // netlify/functions/b2-auth.js
 
 exports.handler = async (event, context) => {
-    // Only allow POST requests
-    if (event.httpMethod !== 'POST') {
-      return {
-        statusCode: 405,
-        headers: {
-          'Access-Control-Allow-Origin': 'https://mocloudapp.netlify.app',
-          'Access-Control-Allow-Headers': 'Content-Type',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS'
-        },
-        body: JSON.stringify({ error: 'Method not allowed' })
-      };
-    }
+    console.log('Function called with method:', event.httpMethod);
+    console.log('Function body:', event.body);
   
     // Handle preflight requests
     if (event.httpMethod === 'OPTIONS') {
@@ -26,115 +16,156 @@ exports.handler = async (event, context) => {
       };
     }
   
+    // Only allow POST requests
+    if (event.httpMethod !== 'POST') {
+      return {
+        statusCode: 405,
+        headers: {
+          'Access-Control-Allow-Origin': 'https://mocloudapp.netlify.app',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS'
+        },
+        body: JSON.stringify({ error: 'Method not allowed' })
+      };
+    }
+  
     try {
-      const { action, ...params } = JSON.parse(event.body);
+      console.log('Parsing request body...');
+      const { action, ...params } = JSON.parse(event.body || '{}');
+      console.log('Action:', action);
   
       const B2_APPLICATION_KEY_ID = '0050a27238881a10000000001';
       const B2_APPLICATION_KEY = 'K0059KSIh9IHtNfHfdoug34H7MA8ArA';
       const B2_BUCKET_NAME = 'Mo_cloud';
   
-      let response;
-  
-      switch (action) {
-        case 'authorize':
-          // B2 Account Authorization
-          const credentials = Buffer.from(`${B2_APPLICATION_KEY_ID}:${B2_APPLICATION_KEY}`, 'utf8').toString('base64');
-          
-          response = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
-            method: 'GET',
-            headers: {
-              'Authorization': `Basic ${credentials}`
-            }
-          });
-          
-          if (!response.ok) {
-            throw new Error(`B2 Authorization failed: ${response.status}`);
+      if (action === 'authorize') {
+        console.log('Starting B2 authorization...');
+        
+        // Create credentials - fix the encoding
+        const authString = `${B2_APPLICATION_KEY_ID}:${B2_APPLICATION_KEY}`;
+        const credentials = Buffer.from(authString).toString('base64');
+        console.log('Credentials created for:', B2_APPLICATION_KEY_ID);
+        
+        // B2 Account Authorization - use global fetch
+        console.log('Calling B2 API...');
+        
+        const authResponse = await globalThis.fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${credentials}`
           }
-          
-          const authData = await response.json();
-          
-          // Get bucket info
-          const bucketResponse = await fetch(`${authData.apiUrl}/b2api/v2/b2_list_buckets`, {
-            method: 'POST',
-            headers: {
-              'Authorization': authData.authorizationToken,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              accountId: B2_APPLICATION_KEY_ID
-            })
-          });
+        });
+        
+        console.log('B2 API response status:', authResponse.status);
+        
+        if (!authResponse.ok) {
+          const errorText = await authResponse.text();
+          console.error('B2 API error response:', errorText);
+          throw new Error(`B2 Authorization failed: ${authResponse.status} - ${errorText}`);
+        }
+        
+        const authData = await authResponse.json();
+        console.log('B2 auth successful, API URL:', authData.apiUrl);
+        
+        // Get bucket info
+        console.log('Getting bucket list...');
+        const bucketResponse = await globalThis.fetch(`${authData.apiUrl}/b2api/v2/b2_list_buckets`, {
+          method: 'POST',
+          headers: {
+            'Authorization': authData.authorizationToken,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            accountId: B2_APPLICATION_KEY_ID
+          })
+        });
   
-          if (!bucketResponse.ok) {
-            throw new Error(`B2 Bucket list failed: ${bucketResponse.status}`);
-          }
+        console.log('Bucket API response status:', bucketResponse.status);
   
-          const bucketData = await bucketResponse.json();
-          const bucket = bucketData.buckets.find(b => b.bucketName === B2_BUCKET_NAME);
-          
-          if (!bucket) {
-            throw new Error(`Bucket ${B2_BUCKET_NAME} not found`);
-          }
+        if (!bucketResponse.ok) {
+          const errorText = await bucketResponse.text();
+          console.error('Bucket API error response:', errorText);
+          throw new Error(`B2 Bucket list failed: ${bucketResponse.status} - ${errorText}`);
+        }
   
-          return {
-            statusCode: 200,
-            headers: {
-              'Access-Control-Allow-Origin': 'https://mocloudapp.netlify.app',
-              'Access-Control-Allow-Headers': 'Content-Type',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              authorizationToken: authData.authorizationToken,
-              apiUrl: authData.apiUrl,
-              downloadUrl: authData.downloadUrl,
-              bucketId: bucket.bucketId
-            })
-          };
+        const bucketData = await bucketResponse.json();
+        console.log('Available buckets:', bucketData.buckets?.map(b => b.bucketName));
+        
+        const bucket = bucketData.buckets?.find(b => b.bucketName === B2_BUCKET_NAME);
+        
+        if (!bucket) {
+          console.error('Bucket not found. Available buckets:', bucketData.buckets?.map(b => b.bucketName));
+          throw new Error(`Bucket ${B2_BUCKET_NAME} not found. Available: ${bucketData.buckets?.map(b => b.bucketName).join(', ')}`);
+        }
   
-        case 'getUploadUrl':
-          // Get upload URL
-          const { authToken, apiUrl, bucketId } = params;
-          
-          response = await fetch(`${apiUrl}/b2api/v2/b2_get_upload_url`, {
-            method: 'POST',
-            headers: {
-              'Authorization': authToken,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              bucketId: bucketId
-            })
-          });
+        console.log('Success! Found bucket:', bucket.bucketName, 'ID:', bucket.bucketId);
   
-          if (!response.ok) {
-            throw new Error(`Get upload URL failed: ${response.status}`);
-          }
+        return {
+          statusCode: 200,
+          headers: {
+            'Access-Control-Allow-Origin': 'https://mocloudapp.netlify.app',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            authorizationToken: authData.authorizationToken,
+            apiUrl: authData.apiUrl,
+            downloadUrl: authData.downloadUrl,
+            bucketId: bucket.bucketId
+          })
+        };
   
-          const uploadData = await response.json();
+      } else if (action === 'getUploadUrl') {
+        console.log('Getting upload URL...');
+        const { authToken, apiUrl, bucketId } = params;
+        
+        const uploadResponse = await globalThis.fetch(`${apiUrl}/b2api/v2/b2_get_upload_url`, {
+          method: 'POST',
+          headers: {
+            'Authorization': authToken,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            bucketId: bucketId
+          })
+        });
   
-          return {
-            statusCode: 200,
-            headers: {
-              'Access-Control-Allow-Origin': 'https://mocloudapp.netlify.app',
-              'Access-Control-Allow-Headers': 'Content-Type',
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(uploadData)
-          };
+        console.log('Upload URL response status:', uploadResponse.status);
   
-        default:
-          return {
-            statusCode: 400,
-            headers: {
-              'Access-Control-Allow-Origin': 'https://mocloudapp.netlify.app',
-              'Access-Control-Allow-Headers': 'Content-Type'
-            },
-            body: JSON.stringify({ error: 'Invalid action' })
-          };
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          console.error('Upload URL error response:', errorText);
+          throw new Error(`Get upload URL failed: ${uploadResponse.status} - ${errorText}`);
+        }
+  
+        const uploadData = await uploadResponse.json();
+        console.log('Upload URL retrieved successfully');
+  
+        return {
+          statusCode: 200,
+          headers: {
+            'Access-Control-Allow-Origin': 'https://mocloudapp.netlify.app',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(uploadData)
+        };
+  
+      } else {
+        console.log('Invalid action:', action);
+        return {
+          statusCode: 400,
+          headers: {
+            'Access-Control-Allow-Origin': 'https://mocloudapp.netlify.app',
+            'Access-Control-Allow-Headers': 'Content-Type'
+          },
+          body: JSON.stringify({ error: `Invalid action: ${action}` })
+        };
       }
   
     } catch (error) {
-      console.error('B2 function error:', error);
+      console.error('Function error:', error.message);
+      console.error('Error stack:', error.stack);
       
       return {
         statusCode: 500,
@@ -144,7 +175,8 @@ exports.handler = async (event, context) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ 
-          error: error.message || 'Internal server error' 
+          error: error.message || 'Internal server error',
+          stack: error.stack
         })
       };
     }
