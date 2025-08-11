@@ -34,9 +34,9 @@ exports.handler = async (event, context) => {
       const { action, ...params } = JSON.parse(event.body || '{}');
       console.log('Action:', action);
   
-      const B2_APPLICATION_KEY_ID = '0050a27238881a10000000001';
-      const B2_APPLICATION_KEY = 'K0059KSIh9IHtNfHfdoug34H7MA8ArA';
-      const B2_BUCKET_NAME = 'Mo_cloud';
+      const B2_APPLICATION_KEY_ID = '0050a27238881a10000000002';
+      const B2_APPLICATION_KEY = 'K005Fk/PCvoUJglOWTsmvhcgAxGk0Jo';
+      const B2_BUCKET_NAME = 'Mo-cloud';
   
       if (action === 'authorize') {
         console.log('Starting B2 authorization...');
