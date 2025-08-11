@@ -1102,36 +1102,36 @@
             }
         }
 
-        // B2 Storage Manager
+        // B2 Storage Manager (Using Netlify Functions)
         class B2StorageManager {
             constructor() {
                 this.authToken = null;
                 this.apiUrl = null;
                 this.downloadUrl = null;
                 this.bucketId = null;
+                this.functionsUrl = 'https://mocloudapp.netlify.app/.netlify/functions';
             }
 
             async authenticate() {
-                const credentials = btoa(`${CONFIG.b2.applicationKeyId}:${CONFIG.b2.applicationKey}`);
-                
                 try {
-                    const response = await fetch('https://api.backblazeb2.com/b2api/v2/b2_authorize_account', {
-                        method: 'GET',
+                    const response = await fetch(`${this.functionsUrl}/b2-auth`, {
+                        method: 'POST',
                         headers: {
-                            'Authorization': `Basic ${credentials}`
-                        }
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ action: 'authorize' })
                     });
 
                     if (!response.ok) {
-                        throw new Error(`B2 Authentication failed: ${response.status}`);
+                        throw new Error(`Function authentication failed: ${response.status}`);
                     }
 
                     const data = await response.json();
                     this.authToken = data.authorizationToken;
                     this.apiUrl = data.apiUrl;
                     this.downloadUrl = data.downloadUrl;
+                    this.bucketId = data.bucketId;
 
-                    await this.getBucketInfo();
                     return true;
                 } catch (error) {
                     console.error('B2 Authentication error:', error);
@@ -1139,44 +1139,24 @@
                 }
             }
 
-            async getBucketInfo() {
-                try {
-                    const response = await fetch(`${this.apiUrl}/b2api/v2/b2_list_buckets`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': this.authToken,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            accountId: CONFIG.b2.applicationKeyId
-                        })
-                    });
-
-                    const data = await response.json();
-                    const bucket = data.buckets.find(b => b.bucketName === CONFIG.b2.bucketName);
-                    if (bucket) {
-                        this.bucketId = bucket.bucketId;
-                    } else {
-                        throw new Error(`Bucket ${CONFIG.b2.bucketName} not found`);
-                    }
-                } catch (error) {
-                    console.error('Error getting bucket info:', error);
-                    throw error;
-                }
-            }
-
             async getUploadUrl() {
                 try {
-                    const response = await fetch(`${this.apiUrl}/b2api/v2/b2_get_upload_url`, {
+                    const response = await fetch(`${this.functionsUrl}/b2-auth`, {
                         method: 'POST',
                         headers: {
-                            'Authorization': this.authToken,
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
+                            action: 'getUploadUrl',
+                            authToken: this.authToken,
+                            apiUrl: this.apiUrl,
                             bucketId: this.bucketId
                         })
                     });
+
+                    if (!response.ok) {
+                        throw new Error(`Get upload URL failed: ${response.status}`);
+                    }
 
                     return await response.json();
                 } catch (error) {
