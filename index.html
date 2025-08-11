@@ -653,6 +653,128 @@
             100% { transform: rotate(360deg); }
         }
         
+        /*=============== FILE MODAL ===============*/
+        .file-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: var(--z-modal);
+            opacity: 0;
+            visibility: hidden;
+            transition: 0.3s;
+        }
+
+        .file-modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 15, 35, 0.95);
+            backdrop-filter: blur(20px);
+        }
+
+        .modal-content {
+            position: relative;
+            max-width: 90vw;
+            max-height: 90vh;
+            margin: 5vh auto;
+            background: linear-gradient(135deg, var(--midnight-dark), var(--midnight-medium));
+            border-radius: 1rem;
+            border: 1px solid rgba(255, 215, 0, 0.2);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+            transform: translateY(30px);
+            transition: 0.3s;
+            overflow: hidden;
+        }
+
+        .file-modal.show .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+        }
+
+        .modal-header h3 {
+            color: var(--title-color);
+            font-size: var(--h3-font-size);
+            margin: 0;
+            word-break: break-word;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            transition: 0.3s;
+        }
+
+        .modal-close:hover {
+            color: var(--first-color);
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        .modal-body {
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-image {
+            max-width: 100%;
+            max-height: 60vh;
+            object-fit: contain;
+            border-radius: 0.5rem;
+            cursor: zoom-in;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            padding: 1.5rem 2rem;
+            border-top: 1px solid rgba(255, 215, 0, 0.2);
+        }
+
+        .modal-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: var(--font-medium);
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .modal-btn.download-btn {
+            background: linear-gradient(135deg, var(--accent-teal), #1DD1A1);
+            color: white;
+        }
+
+        .modal-btn.download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(45, 212, 191, 0.3);
+        }
+
         /*=============== HIDDEN STATE ===============*/
         .hidden {
             display: none;
@@ -738,69 +860,15 @@
                 <div id="recentView">
                     <h2 class="section-title">Recent Files</h2>
                     <div class="files-grid" id="recentFiles">
-                        <!-- Sample files for demo -->
-                        <div class="file-card" style="animation-delay: 0.1s;" data-sample>
-                            <i class="fas fa-play-circle file-icon video"></i>
-                            <div class="file-info">
-                                <h4>Summer_Vacation.mp4</h4>
-                                <div class="file-meta">
-                                    <span>25.4 MB</span>
-                                    <span>2 hours ago</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="file-card" style="animation-delay: 0.2s;" data-sample>
-                            <i class="fas fa-file-pdf file-icon pdf"></i>
-                            <div class="file-info">
-                                <h4>Project_Report.pdf</h4>
-                                <div class="file-meta">
-                                    <span>1.2 MB</span>
-                                    <span>1 day ago</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="file-card" style="animation-delay: 0.3s;" data-sample>
-                            <i class="fas fa-image file-icon image"></i>
-                            <div class="file-info">
-                                <h4>Screenshot_2024.png</h4>
-                                <div class="file-meta">
-                                    <span>856 KB</span>
-                                    <span>3 days ago</span>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- Real uploaded files will appear here -->
                     </div>
                 </div>
 
                 <!-- Organized View -->
                 <div id="organizedView" class="hidden">
                     <h2 class="section-title">Your Files</h2>
-                    <div class="folders-grid">
-                        <div class="folder-card">
-                            <i class="fas fa-video folder-icon videos"></i>
-                            <div class="folder-name">Videos</div>
-                            <div class="folder-count">12 files</div>
-                        </div>
-                        
-                        <div class="folder-card">
-                            <i class="fas fa-images folder-icon images"></i>
-                            <div class="folder-name">Images</div>
-                            <div class="folder-count">45 files</div>
-                        </div>
-                        
-                        <div class="folder-card">
-                            <i class="fas fa-file-alt folder-icon documents"></i>
-                            <div class="folder-name">Documents</div>
-                            <div class="folder-count">23 files</div>
-                        </div>
-                        
-                        <div class="folder-card">
-                            <i class="fas fa-folder folder-icon others"></i>
-                            <div class="folder-name">Others</div>
-                            <div class="folder-count">8 files</div>
-                        </div>
+                    <div class="folders-grid" id="foldersGrid">
+                        <!-- Folders will be populated dynamically -->
                     </div>
                 </div>
             </section>
@@ -811,7 +879,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
         import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
         
         // Configuration
         const CONFIG = {
@@ -834,7 +902,6 @@
         const app = initializeApp(CONFIG.firebase);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const googleProvider = new GoogleAuthProvider();
         
         window.db = db;
         window.auth = auth;
@@ -891,15 +958,6 @@
                 }
             }
 
-            async signInWithGoogle() {
-                try {
-                    await signInWithPopup(auth, googleProvider);
-                    return { success: true };
-                } catch (error) {
-                    return { success: false, error: error.message };
-                }
-            }
-
             async signOut() {
                 try {
                     await signOut(auth);
@@ -949,15 +1007,6 @@
                             <button type="submit" class="auth-btn primary">Create Account</button>
                             <div class="auth-error" id="signupError"></div>
                         </form>
-
-                        <div class="auth-divider">
-                            <span>or</span>
-                        </div>
-
-                        <button id="googleSignIn" class="auth-btn google">
-                            <i class="fab fa-google"></i>
-                            Continue with Google
-                        </button>
                     </div>
                 `;
 
@@ -1018,11 +1067,6 @@
                         errorEl.textContent = result.error;
                         errorEl.style.display = 'block';
                     }
-                });
-
-                // Google sign in
-                document.getElementById('googleSignIn').addEventListener('click', async () => {
-                    await this.signInWithGoogle();
                 });
             }
         }
@@ -1116,14 +1160,24 @@
                     // Create file path with user folder
                     const filePath = `${userId}/${fileName}`;
                     
+                    // Get Firebase user token to authenticate with Supabase
+                    const user = auth.currentUser;
+                    let authHeaders = {
+                        'Authorization': `Bearer ${this.supabaseKey}`,
+                        'Content-Type': 'application/octet-stream',
+                        'x-upsert': 'true'
+                    };
+
+                    // Add Firebase token if available
+                    if (user) {
+                        const token = await user.getIdToken();
+                        authHeaders['x-firebase-token'] = token;
+                    }
+                    
                     // Upload to Supabase Storage
                     const response = await fetch(`${this.supabaseUrl}/storage/v1/object/${this.bucketName}/${filePath}`, {
                         method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${this.supabaseKey}`,
-                            'Content-Type': 'application/octet-stream',
-                            'x-upsert': 'true' // Allow overwrite if file exists
-                        },
+                        headers: authHeaders,
                         body: encryptedData
                     });
 
@@ -1199,6 +1253,7 @@
                 this.encryptionManager = null;
                 this.storageManager = new SupabaseStorageManager();
                 this.files = [];
+                this.currentFilter = 'all'; // Track current filter
             }
 
             async initialize() {
@@ -1343,13 +1398,138 @@
             refreshFileDisplay() {
                 const recentFiles = document.getElementById('recentFiles');
                 
-                const existingCards = recentFiles.querySelectorAll('.file-card:not([data-sample])');
-                existingCards.forEach(card => card.remove());
+                // Clear existing files
+                recentFiles.innerHTML = '';
 
-                this.files.forEach((file, index) => {
+                // Filter files based on current filter
+                let filteredFiles = this.files;
+                if (this.currentFilter !== 'all') {
+                    filteredFiles = this.files.filter(file => 
+                        (file.folder || 'others') === this.currentFilter
+                    );
+                }
+
+                // Add filtered files
+                filteredFiles.forEach((file, index) => {
                     const fileCard = this.createFileCard(file, index);
                     recentFiles.appendChild(fileCard);
                 });
+
+                // Show "no files" message if empty
+                if (filteredFiles.length === 0) {
+                    const emptyMessage = document.createElement('div');
+                    emptyMessage.className = 'empty-message';
+                    emptyMessage.style.cssText = `
+                        text-align: center;
+                        padding: 3rem;
+                        color: var(--text-color-light);
+                        font-size: var(--normal-font-size);
+                    `;
+                    emptyMessage.innerHTML = `
+                        <i class="fas fa-folder-open" style="font-size: 3rem; margin-bottom: 1rem; display: block;"></i>
+                        ${this.currentFilter === 'all' 
+                            ? 'No files uploaded yet. Start by uploading your first file!' 
+                            : `No ${this.currentFilter} found. Try uploading some ${this.currentFilter}!`
+                        }
+                    `;
+                    recentFiles.appendChild(emptyMessage);
+                }
+
+                // Update organized view
+                this.updateOrganizedView();
+            }
+
+            updateOrganizedView() {
+                const foldersGrid = document.getElementById('foldersGrid');
+                foldersGrid.innerHTML = '';
+
+                // Count files by folder
+                const folderCounts = {};
+                this.files.forEach(file => {
+                    const folder = file.folder || 'others';
+                    folderCounts[folder] = (folderCounts[folder] || 0) + 1;
+                });
+
+                // Create folder cards
+                const folderTypes = [
+                    { key: 'videos', name: 'Videos', icon: 'fas fa-video', class: 'videos' },
+                    { key: 'images', name: 'Images', icon: 'fas fa-images', class: 'images' },
+                    { key: 'documents', name: 'Documents', icon: 'fas fa-file-alt', class: 'documents' },
+                    { key: 'others', name: 'Others', icon: 'fas fa-folder', class: 'others' }
+                ];
+
+                folderTypes.forEach(folderType => {
+                    const count = folderCounts[folderType.key] || 0;
+                    const folderCard = document.createElement('div');
+                    folderCard.className = 'folder-card';
+                    folderCard.innerHTML = `
+                        <i class="${folderType.icon} folder-icon ${folderType.class}"></i>
+                        <div class="folder-name">${folderType.name}</div>
+                        <div class="folder-count">${count} files</div>
+                    `;
+                    
+                    // Click to filter files by folder
+                    folderCard.addEventListener('click', () => {
+                        this.filterFilesByFolder(folderType.key);
+                    });
+                    
+                    foldersGrid.appendChild(folderCard);
+                });
+
+                // Add "All Files" card at the beginning
+                const allFilesCard = document.createElement('div');
+                allFilesCard.className = 'folder-card';
+                allFilesCard.style.order = '-1'; // Put it first
+                allFilesCard.innerHTML = `
+                    <i class="fas fa-th-large folder-icon" style="color: var(--first-color);"></i>
+                    <div class="folder-name">All Files</div>
+                    <div class="folder-count">${this.files.length} files</div>
+                `;
+                
+                allFilesCard.addEventListener('click', () => {
+                    this.filterFilesByFolder('all');
+                });
+                
+                foldersGrid.appendChild(allFilesCard);
+            }
+            }
+
+            filterFilesByFolder(folderType) {
+                console.log(`Filtering files by folder: ${folderType}`);
+                
+                // Show filtered view
+                this.currentFilter = folderType;
+                this.refreshFileDisplay();
+                
+                // Switch to Recent view to show filtered results
+                const recentBtn = document.querySelector('[data-view="recent"]');
+                const organizedBtn = document.querySelector('[data-view="organized"]');
+                const toggleIndicator = document.getElementById('toggleIndicator');
+                const recentView = document.getElementById('recentView');
+                const organizedView = document.getElementById('organizedView');
+                
+                // Update button states
+                recentBtn.classList.add('active');
+                organizedBtn.classList.remove('active');
+                toggleIndicator.classList.remove('organized');
+                
+                // Show recent view with filtered files
+                organizedView.classList.add('hidden');
+                recentView.classList.remove('hidden');
+                
+                // Update section title
+                const sectionTitle = recentView.querySelector('.section-title');
+                if (folderType === 'all') {
+                    sectionTitle.textContent = 'Recent Files';
+                } else {
+                    const folderNames = {
+                        'videos': 'Videos',
+                        'images': 'Images', 
+                        'documents': 'Documents',
+                        'others': 'Other Files'
+                    };
+                    sectionTitle.textContent = folderNames[folderType] || 'Filtered Files';
+                }
             }
 
             createFileCard(file, index) {
@@ -1412,7 +1592,120 @@
             }
 
             async openFile(file) {
-                alert(`File viewer coming soon! File: ${file.originalName}`);
+                try {
+                    console.log('Opening file:', file.originalName);
+                    
+                    if (file.type.startsWith('image/')) {
+                        await this.openImageViewer(file);
+                    } else if (file.type === 'application/pdf') {
+                        await this.openPDFViewer(file);
+                    } else if (file.type.startsWith('video/')) {
+                        await this.openVideoPlayer(file);
+                    } else {
+                        // For other file types, just download
+                        await this.downloadFile(file);
+                    }
+                } catch (error) {
+                    console.error('Error opening file:', error);
+                    alert('Error opening file');
+                }
+            }
+
+            async openImageViewer(file) {
+                try {
+                    console.log(`Opening image: ${file.originalName}`);
+                    
+                    // Download and decrypt image
+                    const encryptedData = await this.storageManager.downloadFile(file.storagePath);
+                    const decryptedData = await this.encryptionManager.decryptFile(encryptedData);
+                    
+                    // Create blob URL
+                    const blob = new Blob([decryptedData], { type: file.type });
+                    const imageUrl = URL.createObjectURL(blob);
+                    
+                    // Create and show image modal
+                    this.showImageModal(imageUrl, file.originalName);
+                    
+                } catch (error) {
+                    console.error('Error opening image:', error);
+                    alert(`Error opening image: ${error.message}`);
+                }
+            }
+
+            showImageModal(imageUrl, fileName) {
+                // Remove existing modal if present
+                const existingModal = document.getElementById('imageModal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+
+                // Create image modal
+                const modal = document.createElement('div');
+                modal.id = 'imageModal';
+                modal.className = 'file-modal';
+                modal.innerHTML = `
+                    <div class="modal-backdrop"></div>
+                    <div class="modal-content image-modal-content">
+                        <div class="modal-header">
+                            <h3>${fileName}</h3>
+                            <button class="modal-close" aria-label="Close">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <img src="${imageUrl}" alt="${fileName}" class="modal-image">
+                        </div>
+                        <div class="modal-footer">
+                            <button class="modal-btn download-btn">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(modal);
+
+                // Show modal with animation
+                setTimeout(() => modal.classList.add('show'), 10);
+
+                // Event listeners
+                const closeBtn = modal.querySelector('.modal-close');
+                const backdrop = modal.querySelector('.modal-backdrop');
+                const downloadBtn = modal.querySelector('.download-btn');
+
+                const closeModal = () => {
+                    modal.classList.remove('show');
+                    setTimeout(() => {
+                        modal.remove();
+                        URL.revokeObjectURL(imageUrl); // Clean up blob URL
+                    }, 300);
+                };
+
+                closeBtn.addEventListener('click', closeModal);
+                backdrop.addEventListener('click', closeModal);
+                
+                downloadBtn.addEventListener('click', () => {
+                    const a = document.createElement('a');
+                    a.href = imageUrl;
+                    a.download = fileName;
+                    a.click();
+                });
+
+                // Close on Escape key
+                document.addEventListener('keydown', function escapeHandler(e) {
+                    if (e.key === 'Escape') {
+                        document.removeEventListener('keydown', escapeHandler);
+                        closeModal();
+                    }
+                });
+            }
+
+            async openPDFViewer(file) {
+                alert(`PDF viewer coming soon! File: ${file.originalName}`);
+            }
+
+            async openVideoPlayer(file) {
+                alert(`Video player coming soon! File: ${file.originalName}`);
             }
 
             generateFileId() {
