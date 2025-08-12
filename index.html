@@ -1272,6 +1272,8 @@
 
                 this.setupSearchListener();
 
+                this.setupFileTypeFilters();
+
                 return true;
             }
 
@@ -1493,6 +1495,114 @@
                 }, 300);
             }
 
+            setupFileTypeFilters() {
+                // Create filter buttons container
+                const filterContainer = document.createElement('div');
+                filterContainer.id = 'fileTypeFilters';
+                filterContainer.style.cssText = `
+                    display: flex;
+                    gap: 0.5rem;
+                    justify-content: center;
+                    margin-bottom: 1.5rem;
+                    flex-wrap: wrap;
+                `;
+
+                const filterTypes = [
+                    { key: 'all', label: 'All Files', icon: 'fas fa-th-large' },
+                    { key: 'images', label: 'Images', icon: 'fas fa-images' },
+                    { key: 'videos', label: 'Videos', icon: 'fas fa-video' },
+                    { key: 'documents', label: 'Documents', icon: 'fas fa-file-alt' },
+                    { key: 'others', label: 'Others', icon: 'fas fa-folder' }
+                ];
+
+                filterTypes.forEach(filter => {
+                    const button = document.createElement('button');
+                    button.className = 'filter-btn';
+                    button.dataset.filter = filter.key;
+                    if (filter.key === 'all') button.classList.add('active');
+                    
+                    button.style.cssText = `
+                        padding: 0.5rem 1rem;
+                        border: 1px solid rgba(255, 215, 0, 0.2);
+                        background: var(--surface-color);
+                        color: var(--text-color);
+                        border-radius: 2rem;
+                        cursor: pointer;
+                        transition: 0.3s;
+                        display: flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                        font-size: var(--small-font-size);
+                    `;
+
+                    button.innerHTML = `
+                        <i class="${filter.icon}"></i>
+                        <span>${filter.label}</span>
+                    `;
+
+                    button.addEventListener('click', () => {
+                        // Remove active class from all buttons
+                        filterContainer.querySelectorAll('.filter-btn').forEach(btn => {
+                            btn.classList.remove('active');
+                            btn.style.background = 'var(--surface-color)';
+                            btn.style.color = 'var(--text-color)';
+                            btn.style.borderColor = 'rgba(255, 215, 0, 0.2)';
+                        });
+
+                        // Add active class to clicked button
+                        button.classList.add('active');
+                        button.style.background = 'linear-gradient(135deg, var(--primary-gold), var(--gold-light))';
+                        button.style.color = 'var(--midnight-deep)';
+                        button.style.borderColor = 'var(--primary-gold)';
+
+                        // Apply filter
+                        this.currentFilter = filter.key;
+                        this.refreshFileDisplay();
+                    });
+
+                    // Add hover effect
+                    button.addEventListener('mouseenter', () => {
+                        if (!button.classList.contains('active')) {
+                            button.style.borderColor = 'var(--primary-gold)';
+                            button.style.transform = 'translateY(-2px)';
+                        }
+                    });
+
+                    button.addEventListener('mouseleave', () => {
+                        if (!button.classList.contains('active')) {
+                            button.style.borderColor = 'rgba(255, 215, 0, 0.2)';
+                            button.style.transform = 'translateY(0)';
+                        }
+                    });
+
+                    filterContainer.appendChild(button);
+                });
+
+                // Insert the filter container in the Recent View
+                const recentView = document.getElementById('recentView');
+                const sectionTitle = recentView.querySelector('.section-title');
+                if (sectionTitle && sectionTitle.nextSibling) {
+                    recentView.insertBefore(filterContainer, sectionTitle.nextSibling);
+                } else {
+                    recentView.appendChild(filterContainer);
+                }
+
+                // Set initial active button style
+                const activeBtn = filterContainer.querySelector('.filter-btn.active');
+                if (activeBtn) {
+                    activeBtn.style.background = 'linear-gradient(135deg, var(--primary-gold), var(--gold-light))';
+                    activeBtn.style.color = 'var(--midnight-deep)';
+                    activeBtn.style.borderColor = 'var(--primary-gold)';
+                }
+            }
+
+            removeFileTypeFilters() {
+                const filterContainer = document.getElementById('fileTypeFilters');
+                if (filterContainer) {
+                    filterContainer.remove();
+                }
+            }
+
 
             async loadFiles() {
                 const user = auth.currentUser;
@@ -1639,6 +1749,8 @@
 
             filterFilesByFolder(folderType) {
                 console.log(`Filtering files by folder: ${folderType}`);
+
+                this.removeFileTypeFilters();
                 
                 // Show filtered view
                 this.currentFilter = folderType;
@@ -1701,11 +1813,67 @@
 
             updateStorageInfo() {
                 const storageUsedEl = document.getElementById('storageUsed');
+                const storageInfoEl = document.getElementById('storageInfo');
                 if (!storageUsedEl) return;
 
                 const totalSize = this.files.reduce((sum, file) => sum + (file.size || 0), 0);
                 const formattedSize = this.formatFileSize(totalSize);
+                const totalGB = totalSize / (1024 * 1024 * 1024); // Convert to GB
+                
                 storageUsedEl.textContent = formattedSize;
+                
+                // Update color based on storage used
+                if (storageInfoEl) {
+                    if (totalGB >= 20) {
+                        // Red for 20GB or more
+                        storageUsedEl.style.color = '#ff6b6b';
+                        storageInfoEl.style.borderColor = '#ff6b6b';
+                        storageInfoEl.style.background = 'linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(255, 107, 107, 0.05))';
+                    } else if (totalGB >= 10) {
+                        // Yellow for 10GB-20GB
+                        storageUsedEl.style.color = 'var(--primary-gold)';
+                        storageInfoEl.style.borderColor = 'var(--primary-gold)';
+                        storageInfoEl.style.background = 'linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 215, 0, 0.05))';
+                    } else {
+                        // Default color for under 10GB
+                        storageUsedEl.style.color = 'var(--first-color)';
+                        storageInfoEl.style.borderColor = 'rgba(255, 215, 0, 0.2)';
+                        storageInfoEl.style.background = 'linear-gradient(135deg, var(--midnight-dark), var(--midnight-medium))';
+                    }
+                }
+                
+                // Add warning message if needed
+                let warningEl = document.getElementById('storageWarning');
+                if (totalGB >= 20) {
+                    if (!warningEl) {
+                        warningEl = document.createElement('div');
+                        warningEl.id = 'storageWarning';
+                        warningEl.style.cssText = `
+                            color: #ff6b6b;
+                            font-size: var(--smaller-font-size);
+                            margin-top: 0.25rem;
+                            font-weight: var(--font-medium);
+                        `;
+                        storageInfoEl.appendChild(warningEl);
+                    }
+                    warningEl.textContent = 'Storage limit reached!';
+                    warningEl.style.color = '#ff6b6b';
+                } else if (totalGB >= 10) {
+                    if (!warningEl) {
+                        warningEl = document.createElement('div');
+                        warningEl.id = 'storageWarning';
+                        warningEl.style.cssText = `
+                            color: var(--primary-gold);
+                            font-size: var(--smaller-font-size);
+                            margin-top: 0.25rem;
+                        `;
+                        storageInfoEl.appendChild(warningEl);
+                    }
+                    warningEl.textContent = 'Storage filling up';
+                    warningEl.style.color = 'var(--primary-gold)';
+                } else if (warningEl) {
+                    warningEl.remove();
+                }
             }
 
             createFileCard(file, index) {
@@ -2167,10 +2335,16 @@
                         toggleIndicator.classList.add('organized');
                         recentView.classList.add('hidden');
                         organizedView.classList.remove('hidden');
+                        // ADD THIS LINE
+                        window.fileManager?.removeFileTypeFilters();
                     } else {
                         toggleIndicator.classList.remove('organized');
                         organizedView.classList.add('hidden');
                         recentView.classList.remove('hidden');
+                        // ADD THESE LINES
+                        window.fileManager?.currentFilter = 'all';
+                        window.fileManager?.refreshFileDisplay();
+                        window.fileManager?.setupFileTypeFilters();
                     }
                 });
             });
