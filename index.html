@@ -841,6 +841,41 @@
                 </div>
             </div>
 
+            <!-- Search and Storage Info -->
+            <div class="controls-section" style="margin-bottom: 2rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                <div class="search-container" style="flex: 1; min-width: 300px; position: relative;">
+                    <input type="text" id="searchInput" placeholder="Search files..." style="
+                        width: 100%;
+                        padding: 0.75rem 1rem 0.75rem 3rem;
+                        border: 1px solid rgba(255, 215, 0, 0.2);
+                        border-radius: 2rem;
+                        background: var(--surface-color);
+                        color: var(--title-color);
+                        font-size: var(--normal-font-size);
+                        transition: 0.3s;
+                    ">
+                    <i class="fas fa-search" style="
+                        position: absolute;
+                        left: 1rem;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        color: var(--text-color-light);
+                        pointer-events: none;
+                    "></i>
+                </div>
+                <div class="storage-info" id="storageInfo" style="
+                    background: linear-gradient(135deg, var(--midnight-dark), var(--midnight-medium));
+                    border: 1px solid rgba(255, 215, 0, 0.2);
+                    border-radius: 1rem;
+                    padding: 1rem;
+                    text-align: center;
+                    min-width: 150px;
+                ">
+                    <div style="color: var(--text-color-light); font-size: var(--small-font-size);">Storage Used</div>
+                    <div style="color: var(--first-color); font-weight: var(--font-semibold);" id="storageUsed">0 MB</div>
+                </div>
+            </div>
+
             <!-- Upload Section -->
             <section class="upload-section">
                 <div class="upload-area" id="uploadArea">
@@ -1329,7 +1364,7 @@
                         type: file.type,
                         uploadDate: new Date(),
                         storagePath: uploadResult.path,
-                        folder: this.determineFolder(file.type)
+                        folder: this.determineFolder(file.type),
                         hash: hashCheck.hash || null
                     };
 
@@ -2533,16 +2568,18 @@
                         toggleIndicator.classList.add('organized');
                         recentView.classList.add('hidden');
                         organizedView.classList.remove('hidden');
-                        // ADD THIS LINE
+                        
                         window.fileManager?.removeFileTypeFilters();
                     } else {
                         toggleIndicator.classList.remove('organized');
                         organizedView.classList.add('hidden');
                         recentView.classList.remove('hidden');
-                        // ADD THESE LINES
-                        window.fileManager?.currentFilter = 'all';
-                        window.fileManager?.refreshFileDisplay();
-                        window.fileManager?.setupFileTypeFilters();
+                        
+                        if (window.fileManager) {
+                            window.fileManager.currentFilter = 'all';
+                            window.fileManager.setupFileTypeFilters();
+                            window.fileManager.refreshFileDisplay();
+                        }
                     }
                 });
             });
