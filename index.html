@@ -1284,6 +1284,20 @@
                     return;
                 }
 
+                // Quick check by name and size
+                const isDuplicateName = await this.checkForDuplicate(file);
+                if (isDuplicateName) {
+                    console.log('Upload cancelled - duplicate file');
+                    return;
+                }
+
+                // Deep check by file hash (for exact duplicate detection)
+                const hashCheck = await this.checkForDuplicateByHash(file);
+                if (hashCheck.isDuplicate) {
+                    console.log('Upload cancelled - exact duplicate');
+                    return;
+                }
+
                 let progressId;
                 try {
                     console.log(`Uploading: ${file.name}`);
@@ -1316,6 +1330,7 @@
                         uploadDate: new Date(),
                         storagePath: uploadResult.path,
                         folder: this.determineFolder(file.type)
+                        hash: hashCheck.hash || null
                     };
 
                     await addDoc(collection(db, 'files'), fileMetadata);
@@ -1600,6 +1615,56 @@
                 const filterContainer = document.getElementById('fileTypeFilters');
                 if (filterContainer) {
                     filterContainer.remove();
+                }
+            }
+
+            async checkForDuplicate(file) {
+                // Check by name and size
+                const duplicate = this.files.find(f => 
+                    f.originalName === file.name && 
+                    f.size === file.size
+                );
+                
+                if (duplicate) {
+                    const proceed = confirm(
+                        `A file named "${file.name}" with the same size already exists.\n\n` +
+                        `Existing file uploaded: ${this.getTimeAgo(duplicate.uploadDate)}\n\n` +
+                        `Do you want to upload it anyway?`
+                    );
+                    return !proceed; // Return true if duplicate and user cancels
+                }
+                
+                return false; // No duplicate found
+            }
+
+            async calculateFileHash(file) {
+                const buffer = await file.arrayBuffer();
+                const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                return hashHex;
+            }
+
+            async checkForDuplicateByHash(file) {
+                try {
+                    const fileHash = await this.calculateFileHash(file);
+                    
+                    // Check if hash exists in our files
+                    const duplicate = this.files.find(f => f.hash === fileHash);
+                    
+                    if (duplicate) {
+                        const proceed = confirm(
+                            `This exact file already exists with the name "${duplicate.originalName}".\n\n` +
+                            `Uploaded: ${this.getTimeAgo(duplicate.uploadDate)}\n\n` +
+                            `Do you want to upload a duplicate?`
+                        );
+                        return { isDuplicate: !proceed, hash: fileHash };
+                    }
+                    
+                    return { isDuplicate: false, hash: fileHash };
+                } catch (error) {
+                    console.error('Error calculating file hash:', error);
+                    return { isDuplicate: false, hash: null };
                 }
             }
 
