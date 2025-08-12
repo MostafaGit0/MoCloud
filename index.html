@@ -1841,7 +1841,7 @@
                 `;
                 createFolderCard.innerHTML = `
                     <i class="fas fa-plus-circle folder-icon" style="color: var(--primary-gold);"></i>
-                    <div class="folder-name">Create Folder</div>
+                    <div class="folder-name">New Folder</div>
                     <div class="folder-count">New</div>
                 `;
                 createFolderCard.addEventListener('click', () => {
@@ -2549,9 +2549,23 @@
 
             // Upload Area Functionality
             if (uploadArea) {
-                uploadArea.addEventListener('click', () => {
-                    fileInput.click();
+                uploadArea.addEventListener('click', (e) => {
+                    // Don't trigger if clicking the button itself
+                    if (e.target.classList.contains('upload-btn') || e.target.closest('.upload-btn')) {
+                        fileInput.click();
+                    } else if (e.target === uploadArea || e.target.parentElement === uploadArea) {
+                        fileInput.click();
+                    }
                 });
+
+                // Also add listener to the button specifically
+                const uploadBtn = uploadArea.querySelector('.upload-btn');
+                if (uploadBtn) {
+                    uploadBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        fileInput.click();
+                    });
+                }
 
                 uploadArea.addEventListener('dragover', (e) => {
                     e.preventDefault();
