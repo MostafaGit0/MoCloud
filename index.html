@@ -878,7 +878,7 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, updateDoc} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
         
         // Configuration
@@ -1668,6 +1668,69 @@
                 }
             }
 
+            async createCustomFolder() {
+                const folderName = prompt('Enter folder name:');
+                if (!folderName || folderName.trim() === '') return;
+                
+                const sanitizedName = folderName.trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
+                
+                // Check if folder already exists
+                const existingFolders = this.getCustomFolders();
+                if (existingFolders.includes(sanitizedName)) {
+                    alert('A folder with this name already exists!');
+                    return;
+                }
+                
+                // Store custom folders in localStorage for persistence
+                const customFolders = JSON.parse(localStorage.getItem(`customFolders_${auth.currentUser.uid}`) || '[]');
+                customFolders.push({
+                    key: sanitizedName,
+                    name: folderName.trim(),
+                    created: new Date().toISOString()
+                });
+                localStorage.setItem(`customFolders_${auth.currentUser.uid}`, JSON.stringify(customFolders));
+                
+                // Refresh the organized view
+                this.updateOrganizedView();
+                
+                alert(`Folder "${folderName}" created successfully!`);
+            }
+
+            getCustomFolders() {
+                if (!auth.currentUser) return [];
+                const customFolders = JSON.parse(localStorage.getItem(`customFolders_${auth.currentUser.uid}`) || '[]');
+                return customFolders.map(f => f.key);
+            }
+
+            getCustomFolderDetails() {
+                if (!auth.currentUser) return [];
+                return JSON.parse(localStorage.getItem(`customFolders_${auth.currentUser.uid}`) || '[]');
+            }
+
+            async moveFileToFolder(file, folderKey) {
+                try {
+                    // Update in Firestore
+                    const fileRef = doc(db, 'files', file.id);
+                    await updateDoc(fileRef, {
+                        folder: folderKey
+                    });
+
+                    // Update local file object
+                    const fileIndex = this.files.findIndex(f => f.id === file.id);
+                    if (fileIndex !== -1) {
+                        this.files[fileIndex].folder = folderKey;
+                    }
+
+                    // Refresh the display
+                    this.refreshFileDisplay();
+                    
+                    console.log(`File moved to folder: ${folderKey}`);
+                } catch (error) {
+                    console.error('Error moving file:', error);
+                    alert(`Failed to move file: ${error.message}`);
+                }
+            }
+
 
             async loadFiles() {
                 const user = auth.currentUser;
@@ -1769,7 +1832,37 @@
                     folderCounts[folder] = (folderCounts[folder] || 0) + 1;
                 });
 
-                // Create folder cards
+                // Add "Create New Folder" card first
+                const createFolderCard = document.createElement('div');
+                createFolderCard.className = 'folder-card';
+                createFolderCard.style.cssText = `
+                    border: 2px dashed rgba(255, 215, 0, 0.3);
+                    background: linear-gradient(135deg, rgba(255, 215, 0, 0.05), rgba(74, 144, 226, 0.03));
+                `;
+                createFolderCard.innerHTML = `
+                    <i class="fas fa-plus-circle folder-icon" style="color: var(--primary-gold);"></i>
+                    <div class="folder-name">Create Folder</div>
+                    <div class="folder-count">New</div>
+                `;
+                createFolderCard.addEventListener('click', () => {
+                    this.createCustomFolder();
+                });
+                foldersGrid.appendChild(createFolderCard);
+
+                // Add "All Files" card
+                const allFilesCard = document.createElement('div');
+                allFilesCard.className = 'folder-card';
+                allFilesCard.innerHTML = `
+                    <i class="fas fa-th-large folder-icon" style="color: var(--first-color);"></i>
+                    <div class="folder-name">All Files</div>
+                    <div class="folder-count">${this.files.length} files</div>
+                `;
+                allFilesCard.addEventListener('click', () => {
+                    this.filterFilesByFolder('all');
+                });
+                foldersGrid.appendChild(allFilesCard);
+
+                // Default folder types
                 const folderTypes = [
                     { key: 'videos', name: 'Videos', icon: 'fas fa-video', class: 'videos' },
                     { key: 'images', name: 'Images', icon: 'fas fa-images', class: 'images' },
@@ -1777,12 +1870,31 @@
                     { key: 'others', name: 'Others', icon: 'fas fa-folder', class: 'others' }
                 ];
 
+                // Add custom folders to the list
+                const customFolders = this.getCustomFolderDetails();
+                customFolders.forEach(folder => {
+                    folderTypes.push({
+                        key: folder.key,
+                        name: folder.name,
+                        icon: 'fas fa-folder-open',
+                        class: 'custom',
+                        isCustom: true
+                    });
+                });
+
+                // Create folder cards
                 folderTypes.forEach(folderType => {
                     const count = folderCounts[folderType.key] || 0;
                     const folderCard = document.createElement('div');
                     folderCard.className = 'folder-card';
+                    
+                    // Add custom folder indicator
+                    if (folderType.isCustom) {
+                        folderCard.style.borderColor = 'rgba(74, 144, 226, 0.3)';
+                    }
+                    
                     folderCard.innerHTML = `
-                        <i class="${folderType.icon} folder-icon ${folderType.class}"></i>
+                        <i class="${folderType.icon} folder-icon ${folderType.class}" ${folderType.isCustom ? 'style="color: var(--accent-blue);"' : ''}></i>
                         <div class="folder-name">${folderType.name}</div>
                         <div class="folder-count">${count} files</div>
                     `;
@@ -1794,22 +1906,6 @@
                     
                     foldersGrid.appendChild(folderCard);
                 });
-
-                // Add "All Files" card at the beginning
-                const allFilesCard = document.createElement('div');
-                allFilesCard.className = 'folder-card';
-                allFilesCard.style.order = '-1'; // Put it first
-                allFilesCard.innerHTML = `
-                    <i class="fas fa-th-large folder-icon" style="color: var(--first-color);"></i>
-                    <div class="folder-name">All Files</div>
-                    <div class="folder-count">${this.files.length} files</div>
-                `;
-                
-                allFilesCard.addEventListener('click', () => {
-                    this.filterFilesByFolder('all');
-                });
-                
-                foldersGrid.appendChild(allFilesCard);
             }
 
             filterFilesByFolder(folderType) {
@@ -1960,10 +2056,13 @@
                         </div>
                     </div>
                     <div class="file-actions" style="position: absolute; top: 1rem; right: 1rem; opacity: 0; transition: 0.3s;">
-                        <button class="download-btn" style="background: var(--accent-teal); color: white; border: none; padding: 0.5rem; border-radius: 0.25rem; margin-right: 0.5rem; cursor: pointer;">
+                        <button class="move-btn" title="Move to folder" style="background: var(--accent-blue); color: white; border: none; padding: 0.5rem; border-radius: 0.25rem; margin-right: 0.5rem; cursor: pointer;">
+                            <i class="fas fa-folder-plus"></i>
+                        </button>
+                        <button class="download-btn" title="Download" style="background: var(--accent-teal); color: white; border: none; padding: 0.5rem; border-radius: 0.25rem; margin-right: 0.5rem; cursor: pointer;">
                             <i class="fas fa-download"></i>
                         </button>
-                        <button class="delete-btn" style="background: #ff6b6b; color: white; border: none; padding: 0.5rem; border-radius: 0.25rem; cursor: pointer;">
+                        <button class="delete-btn" title="Delete" style="background: #ff6b6b; color: white; border: none; padding: 0.5rem; border-radius: 0.25rem; cursor: pointer;">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -1978,6 +2077,40 @@
                 fileCard.addEventListener('mouseleave', () => {
                     const actions = fileCard.querySelector('.file-actions');
                     actions.style.opacity = '0';
+                });
+
+                // Move to folder button
+                fileCard.querySelector('.move-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    
+                    // Get all folders
+                    const defaultFolders = ['videos', 'images', 'documents', 'others'];
+                    const customFolders = this.getCustomFolderDetails();
+                    
+                    let folderOptions = 'Select folder:\n\n';
+                    defaultFolders.forEach((f, i) => {
+                        folderOptions += `${i + 1}. ${f.charAt(0).toUpperCase() + f.slice(1)}\n`;
+                    });
+                    customFolders.forEach((f, i) => {
+                        folderOptions += `${defaultFolders.length + i + 1}. ${f.name} (custom)\n`;
+                    });
+                    
+                    const choice = prompt(folderOptions);
+                    if (!choice) return;
+                    
+                    const choiceNum = parseInt(choice);
+                    if (isNaN(choiceNum) || choiceNum < 1) return;
+                    
+                    let selectedFolder;
+                    if (choiceNum <= defaultFolders.length) {
+                        selectedFolder = defaultFolders[choiceNum - 1];
+                    } else if (choiceNum <= defaultFolders.length + customFolders.length) {
+                        selectedFolder = customFolders[choiceNum - defaultFolders.length - 1].key;
+                    }
+                    
+                    if (selectedFolder) {
+                        this.moveFileToFolder(file, selectedFolder);
+                    }
                 });
                 
                 // Download button
