@@ -1269,6 +1269,9 @@
 
                 // Load existing files for this user
                 await this.loadFiles();
+
+                this.setupSearchListener();
+
                 return true;
             }
 
@@ -1279,18 +1282,27 @@
                     return;
                 }
 
+                let progressId;
                 try {
                     console.log(`Uploading: ${file.name}`);
                     
+                    // Show upload progress
+                    progressId = this.showUploadProgress(file.name);
+                    this.updateUploadProgress(progressId, 10, 'Encrypting file...');
+                    
                     // Encrypt file
                     const encryptedData = await this.encryptionManager.encryptFile(file);
+                    this.updateUploadProgress(progressId, 40, 'Preparing upload...');
                     
                     // Generate unique file ID and path
                     const fileId = this.generateFileId();
                     const encryptedFileName = `${fileId}.enc`;
 
+                    this.updateUploadProgress(progressId, 60, 'Uploading to cloud...');
+                    
                     // Upload to Supabase
                     const uploadResult = await this.storageManager.uploadFile(encryptedData, encryptedFileName, user.uid);
+                    this.updateUploadProgress(progressId, 80, 'Saving metadata...');
 
                     // Save metadata to Firestore
                     const fileMetadata = {
@@ -1305,16 +1317,23 @@
                     };
 
                     await addDoc(collection(db, 'files'), fileMetadata);
+                    this.updateUploadProgress(progressId, 100, 'Upload complete!');
 
                     // Add to local files array and refresh UI
                     this.files.unshift(fileMetadata);
                     this.refreshFileDisplay();
+
+                    // Hide progress after delay
+                    setTimeout(() => this.hideUploadProgress(progressId), 2000);
 
                     console.log(`Upload complete: ${file.name}`);
                     return fileMetadata;
                 } catch (error) {
                     console.error('Upload error:', error);
                     alert(`Upload failed: ${error.message}`);
+                    if (progressId) {
+                        this.hideUploadProgress(progressId);
+                    }
                     throw error;
                 }
             }
@@ -1364,6 +1383,8 @@
                     // Remove from local array and refresh UI
                     this.files = this.files.filter(f => f.id !== fileMetadata.id);
                     this.refreshFileDisplay();
+
+                    this.updateStorageInfo();
                     
                     console.log(`Delete complete: ${fileMetadata.originalName}`);
                 } catch (error) {
@@ -1371,6 +1392,107 @@
                     alert(`Delete failed: ${error.message}`);
                 }
             }
+
+            showUploadProgress(fileName) {
+                const progressId = 'upload_' + Date.now();
+                
+                // Create or get progress container
+                let progressContainer = document.getElementById('uploadProgressContainer');
+                if (!progressContainer) {
+                    progressContainer = document.createElement('div');
+                    progressContainer.id = 'uploadProgressContainer';
+                    progressContainer.style.cssText = `
+                        position: fixed;
+                        top: 80px;
+                        right: 20px;
+                        z-index: 1001;
+                        max-width: 400px;
+                        pointer-events: none;
+                    `;
+                    document.body.appendChild(progressContainer);
+                }
+
+                const progressItem = document.createElement('div');
+                progressItem.id = progressId;
+                progressItem.style.cssText = `
+                    background: linear-gradient(135deg, var(--midnight-dark), var(--midnight-medium));
+                    border: 1px solid rgba(255, 215, 0, 0.2);
+                    border-radius: 0.5rem;
+                    padding: 1rem;
+                    margin-bottom: 0.5rem;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                    animation: slideInRight 0.3s ease;
+                    pointer-events: auto;
+                `;
+
+                progressItem.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <i class="fas fa-cloud-upload-alt" style="color: var(--first-color);"></i>
+                        <span style="color: var(--title-color); font-size: var(--small-font-size); flex: 1; word-break: break-word;">${fileName}</span>
+                        <button onclick="window.fileManager.hideUploadProgress('${progressId}')" style="background: none; border: none; color: var(--text-color); cursor: pointer; padding: 0.25rem;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div style="background: var(--surface-color); border-radius: 1rem; height: 0.5rem; overflow: hidden;">
+                        <div class="progress-bar" style="height: 100%; background: linear-gradient(90deg, var(--primary-gold), var(--gold-light)); width: 0%; transition: width 0.3s ease; border-radius: 1rem;"></div>
+                    </div>
+                    <div class="progress-text" style="color: var(--text-color-light); font-size: var(--smaller-font-size); margin-top: 0.25rem;">Starting upload...</div>
+                `;
+
+                progressContainer.appendChild(progressItem);
+
+                // Add animation styles if not already added
+                if (!document.getElementById('progressAnimations')) {
+                    const style = document.createElement('style');
+                    style.id = 'progressAnimations';
+                    style.textContent = `
+                        @keyframes slideInRight {
+                            from { transform: translateX(100%); opacity: 0; }
+                            to { transform: translateX(0); opacity: 1; }
+                        }
+                        @keyframes slideOutRight {
+                            from { transform: translateX(0); opacity: 1; }
+                            to { transform: translateX(100%); opacity: 0; }
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+
+                return progressId;
+            }
+
+            updateUploadProgress(progressId, percentage, message) {
+                const progressItem = document.getElementById(progressId);
+                if (!progressItem) return;
+
+                const progressBar = progressItem.querySelector('.progress-bar');
+                const progressText = progressItem.querySelector('.progress-text');
+
+                if (progressBar) {
+                    progressBar.style.width = percentage + '%';
+                }
+
+                if (progressText) {
+                    progressText.textContent = message;
+                }
+            }
+
+            hideUploadProgress(progressId) {
+                const progressItem = document.getElementById(progressId);
+                if (!progressItem) return;
+
+                progressItem.style.animation = 'slideOutRight 0.3s ease';
+                setTimeout(() => {
+                    progressItem.remove();
+                    
+                    // Remove container if empty
+                    const container = document.getElementById('uploadProgressContainer');
+                    if (container && container.children.length === 0) {
+                        container.remove();
+                    }
+                }, 300);
+            }
+
 
             async loadFiles() {
                 const user = auth.currentUser;
@@ -1401,11 +1523,24 @@
                 // Clear existing files
                 recentFiles.innerHTML = '';
 
-                // Filter files based on current filter
+                // Get search term
+                const searchInput = document.getElementById('searchInput');
+                const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+
+                // Filter files based on current filter and search
                 let filteredFiles = this.files;
+                
+                // Apply folder filter
                 if (this.currentFilter !== 'all') {
-                    filteredFiles = this.files.filter(file => 
+                    filteredFiles = filteredFiles.filter(file => 
                         (file.folder || 'others') === this.currentFilter
+                    );
+                }
+
+                // Apply search filter
+                if (searchTerm) {
+                    filteredFiles = filteredFiles.filter(file => 
+                        file.originalName.toLowerCase().includes(searchTerm)
                     );
                 }
 
@@ -1425,18 +1560,27 @@
                         color: var(--text-color-light);
                         font-size: var(--normal-font-size);
                     `;
+                    
+                    let messageText;
+                    if (searchTerm) {
+                        messageText = `No files found matching "${searchTerm}"`;
+                    } else if (this.currentFilter === 'all') {
+                        messageText = 'No files uploaded yet. Start by uploading your first file!';
+                    } else {
+                        messageText = `No ${this.currentFilter} found. Try uploading some ${this.currentFilter}!`;
+                    }
+                    
                     emptyMessage.innerHTML = `
                         <i class="fas fa-folder-open" style="font-size: 3rem; margin-bottom: 1rem; display: block;"></i>
-                        ${this.currentFilter === 'all' 
-                            ? 'No files uploaded yet. Start by uploading your first file!' 
-                            : `No ${this.currentFilter} found. Try uploading some ${this.currentFilter}!`
-                        }
+                        ${messageText}
                     `;
                     recentFiles.appendChild(emptyMessage);
                 }
 
                 // Update organized view
                 this.updateOrganizedView();
+
+                this.updateStorageInfo();
             }
 
             updateOrganizedView() {
@@ -1531,6 +1675,39 @@
                 }
             }
 
+            setupSearchListener() {
+                const searchInput = document.getElementById('searchInput');
+                if (!searchInput) return;
+
+                let searchTimeout;
+                searchInput.addEventListener('input', () => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        this.refreshFileDisplay();
+                    }, 300); // Debounce search
+                });
+
+                // Style search input on focus
+                searchInput.addEventListener('focus', () => {
+                    searchInput.style.borderColor = 'var(--primary-gold)';
+                    searchInput.style.boxShadow = '0 0 0 2px rgba(255, 215, 0, 0.2)';
+                });
+
+                searchInput.addEventListener('blur', () => {
+                    searchInput.style.borderColor = 'rgba(255, 215, 0, 0.2)';
+                    searchInput.style.boxShadow = 'none';
+                });
+            }
+
+            updateStorageInfo() {
+                const storageUsedEl = document.getElementById('storageUsed');
+                if (!storageUsedEl) return;
+
+                const totalSize = this.files.reduce((sum, file) => sum + (file.size || 0), 0);
+                const formattedSize = this.formatFileSize(totalSize);
+                storageUsedEl.textContent = formattedSize;
+            }
+
             createFileCard(file, index) {
                 const fileCard = document.createElement('div');
                 fileCard.className = 'file-card';
@@ -1623,7 +1800,7 @@
                     const imageUrl = URL.createObjectURL(blob);
                     
                     // Create and show image modal
-                    this.showImageModal(imageUrl, file.originalName);
+                    this.showImageModal(imageUrl, file.originalName, file);
                     
                 } catch (error) {
                     console.error('Error opening image:', error);
@@ -1631,7 +1808,7 @@
                 }
             }
 
-            showImageModal(imageUrl, fileName) {
+            showImageModal(imageUrl, fileName, file) {
                 // Remove existing modal if present
                 const existingModal = document.getElementById('imageModal');
                 if (existingModal) {
@@ -1684,10 +1861,7 @@
                 backdrop.addEventListener('click', closeModal);
                 
                 downloadBtn.addEventListener('click', () => {
-                    const a = document.createElement('a');
-                    a.href = imageUrl;
-                    a.download = fileName;
-                    a.click();
+                    this.downloadFile(file);
                 });
 
                 // Close on Escape key
@@ -1700,11 +1874,218 @@
             }
 
             async openPDFViewer(file) {
-                alert(`PDF viewer coming soon! File: ${file.originalName}`);
+                try {
+                    console.log(`Opening PDF: ${file.originalName}`);
+                    
+                    // Show loading
+                    this.showLoadingModal('Loading PDF...');
+                    
+                    // Download and decrypt PDF
+                    const encryptedData = await this.storageManager.downloadFile(file.storagePath);
+                    const decryptedData = await this.encryptionManager.decryptFile(encryptedData);
+                    
+                    // Create blob URL
+                    const blob = new Blob([decryptedData], { type: 'application/pdf' });
+                    const pdfUrl = URL.createObjectURL(blob);
+                    
+                    // Hide loading and show PDF modal
+                    this.hideLoadingModal();
+                    this.showPDFModal(pdfUrl, file.originalName, file);
+                    
+                } catch (error) {
+                    this.hideLoadingModal();
+                    console.error('Error opening PDF:', error);
+                    alert(`Error opening PDF: ${error.message}`);
+                }
+            }
+
+            showPDFModal(pdfUrl, fileName, fileMetadata) {
+                // Remove existing modal if present
+                const existingModal = document.getElementById('pdfModal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+
+                // Create PDF modal
+                const modal = document.createElement('div');
+                modal.id = 'pdfModal';
+                modal.className = 'file-modal';
+                modal.innerHTML = `
+                    <div class="modal-backdrop"></div>
+                    <div class="modal-content pdf-modal-content" style="max-width: 95vw; max-height: 95vh;">
+                        <div class="modal-header">
+                            <h3>${fileName}</h3>
+                            <button class="modal-close" aria-label="Close">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="modal-body" style="padding: 0; height: 80vh;">
+                            <iframe src="${pdfUrl}" style="width: 100%; height: 100%; border: none;" title="${fileName}"></iframe>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="modal-btn download-btn">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(modal);
+
+                // Show modal with animation
+                setTimeout(() => modal.classList.add('show'), 10);
+
+                // Event listeners
+                const closeBtn = modal.querySelector('.modal-close');
+                const backdrop = modal.querySelector('.modal-backdrop');
+                const downloadBtn = modal.querySelector('.download-btn');
+
+                const closeModal = () => {
+                    modal.classList.remove('show');
+                    setTimeout(() => {
+                        modal.remove();
+                        URL.revokeObjectURL(pdfUrl); // Clean up blob URL
+                    }, 300);
+                };
+
+                closeBtn.addEventListener('click', closeModal);
+                backdrop.addEventListener('click', closeModal);
+                
+                downloadBtn.addEventListener('click', () => {
+                    this.downloadFile(fileMetadata);
+                });
+
+                // Close on Escape key
+                document.addEventListener('keydown', function escapeHandler(e) {
+                    if (e.key === 'Escape') {
+                        document.removeEventListener('keydown', escapeHandler);
+                        closeModal();
+                    }
+                });
             }
 
             async openVideoPlayer(file) {
-                alert(`Video player coming soon! File: ${file.originalName}`);
+                try {
+                    console.log(`Opening video: ${file.originalName}`);
+                    
+                    // Show loading
+                    this.showLoadingModal('Loading video...');
+                    
+                    // Download and decrypt video
+                    const encryptedData = await this.storageManager.downloadFile(file.storagePath);
+                    const decryptedData = await this.encryptionManager.decryptFile(encryptedData);
+                    
+                    // Create blob URL
+                    const blob = new Blob([decryptedData], { type: file.type });
+                    const videoUrl = URL.createObjectURL(blob);
+                    
+                    // Hide loading and show video modal
+                    this.hideLoadingModal();
+                    this.showVideoModal(videoUrl, file.originalName, file);
+                    
+                } catch (error) {
+                    this.hideLoadingModal();
+                    console.error('Error opening video:', error);
+                    alert(`Error opening video: ${error.message}`);
+                }
+            }
+
+            showVideoModal(videoUrl, fileName, fileMetadata) {
+                // Remove existing modal if present
+                const existingModal = document.getElementById('videoModal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+
+                // Create video modal
+                const modal = document.createElement('div');
+                modal.id = 'videoModal';
+                modal.className = 'file-modal';
+                modal.innerHTML = `
+                    <div class="modal-backdrop"></div>
+                    <div class="modal-content video-modal-content" style="max-width: 90vw; max-height: 90vh;">
+                        <div class="modal-header">
+                            <h3>${fileName}</h3>
+                            <button class="modal-close" aria-label="Close">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="modal-body" style="padding: 1rem;">
+                            <video controls style="width: 100%; max-height: 70vh; border-radius: 0.5rem;" preload="metadata">
+                                <source src="${videoUrl}" type="${fileMetadata.type}">
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="modal-btn download-btn">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(modal);
+
+                // Show modal with animation
+                setTimeout(() => modal.classList.add('show'), 10);
+
+                // Event listeners
+                const closeBtn = modal.querySelector('.modal-close');
+                const backdrop = modal.querySelector('.modal-backdrop');
+                const downloadBtn = modal.querySelector('.download-btn');
+                const video = modal.querySelector('video');
+
+                const closeModal = () => {
+                    video.pause(); // Stop video playback
+                    modal.classList.remove('show');
+                    setTimeout(() => {
+                        modal.remove();
+                        URL.revokeObjectURL(videoUrl); // Clean up blob URL
+                    }, 300);
+                };
+
+                closeBtn.addEventListener('click', closeModal);
+                backdrop.addEventListener('click', closeModal);
+                
+                downloadBtn.addEventListener('click', () => {
+                    this.downloadFile(fileMetadata);
+                });
+
+                // Close on Escape key
+                document.addEventListener('keydown', function escapeHandler(e) {
+                    if (e.key === 'Escape') {
+                        document.removeEventListener('keydown', escapeHandler);
+                        closeModal();
+                    }
+                });
+            }
+
+            showLoadingModal(message) {
+                // Remove existing loading modal
+                const existingModal = document.getElementById('loadingModal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+
+                const modal = document.createElement('div');
+                modal.id = 'loadingModal';
+                modal.className = 'file-modal show';
+                modal.innerHTML = `
+                    <div class="modal-backdrop"></div>
+                    <div class="modal-content" style="max-width: 400px; text-align: center; padding: 3rem;">
+                        <div class="spinner" style="margin: 0 auto 1rem;"></div>
+                        <p style="color: var(--title-color); font-size: var(--normal-font-size);">${message}</p>
+                    </div>
+                `;
+
+                document.body.appendChild(modal);
+            }
+
+            hideLoadingModal() {
+                const modal = document.getElementById('loadingModal');
+                if (modal) {
+                    modal.remove();
+                }
             }
 
             generateFileId() {
