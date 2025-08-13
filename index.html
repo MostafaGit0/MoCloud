@@ -1180,105 +1180,229 @@
             }
         }
 
-        // Supabase Storage Manager
-        class SupabaseStorageManager {
+        // Firebase Storage Manager with Streaming Support
+        class FirebaseStorageManager {
             constructor() {
-                this.supabaseUrl = CONFIG.supabase.url;
-                this.supabaseKey = CONFIG.supabase.anonKey;
-                this.bucketName = 'files';
+                this.storage = null;
+                this.initialized = false;
             }
 
-            async uploadFile(encryptedData, fileName, userId) {
+            async initialize() {
+                if (this.initialized) return;
+                
+                const { getStorage } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-storage.js');
+                this.storage = getStorage();
+                this.initialized = true;
+            }
+
+            async uploadFile(data, fileName, userId, onProgress) {
+                await this.initialize();
+                
+                const { ref, uploadBytesResumable, getDownloadURL } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-storage.js');
+                
                 try {
-                    console.log(`Uploading ${fileName} to Supabase...`);
+                    console.log(`Uploading ${fileName} to Firebase Storage...`);
                     
-                    // Create file path with user folder
-                    const filePath = `${userId}/${fileName}`;
+                    const filePath = `users/${userId}/${fileName}`;
+                    const storageRef = ref(this.storage, filePath);
                     
-                    // Get Firebase user token to authenticate with Supabase
-                    const user = auth.currentUser;
-                    let authHeaders = {
-                        'Authorization': `Bearer ${this.supabaseKey}`,
-                        'Content-Type': 'application/octet-stream',
-                        'x-upsert': 'true'
-                    };
-
-                    // Add Firebase token if available
-                    if (user) {
-                        const token = await user.getIdToken();
-                        authHeaders['x-firebase-token'] = token;
+                    // Handle both File objects and Uint8Array (encrypted data)
+                    let blob;
+                    if (data instanceof File) {
+                        blob = data; // Direct file upload for streaming
+                    } else {
+                        blob = new Blob([data], { type: 'application/octet-stream' }); // Encrypted data
                     }
                     
-                    // Upload to Supabase Storage
-                    const response = await fetch(`${this.supabaseUrl}/storage/v1/object/${this.bucketName}/${filePath}`, {
-                        method: 'POST',
-                        headers: authHeaders,
-                        body: encryptedData
+                    const uploadTask = uploadBytesResumable(storageRef, blob);
+                    
+                    return new Promise((resolve, reject) => {
+                        uploadTask.on('state_changed',
+                            (snapshot) => {
+                                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                                console.log('Upload is ' + progress + '% done');
+                                if (onProgress) onProgress(progress);
+                            },
+                            (error) => {
+                                console.error('Upload error:', error);
+                                reject(error);
+                            },
+                            async () => {
+                                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                                resolve({
+                                    path: filePath,
+                                    fullPath: downloadURL,
+                                    id: fileName
+                                });
+                            }
+                        );
                     });
-
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        console.error('Supabase upload error:', errorText);
-                        throw new Error(`Upload failed: ${response.status} - ${errorText}`);
-                    }
-
-                    const result = await response.json();
-                    console.log('Upload successful:', result);
-
-                    return {
-                        path: filePath,
-                        fullPath: result.Key || filePath,
-                        id: result.Id || fileName
-                    };
                 } catch (error) {
-                    console.error('Error uploading to Supabase:', error);
+                    console.error('Error uploading to Firebase Storage:', error);
                     throw error;
                 }
             }
 
             async downloadFile(filePath) {
+                await this.initialize();
+                
+                const { ref, getDownloadURL } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-storage.js');
+                
                 try {
-                    console.log(`Downloading ${filePath} from Supabase...`);
+                    console.log(`Downloading ${filePath} from Firebase Storage...`);
                     
-                    const response = await fetch(`${this.supabaseUrl}/storage/v1/object/${this.bucketName}/${filePath}`, {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${this.supabaseKey}`
-                        }
-                    });
-
+                    let url;
+                    if (filePath.startsWith('http')) {
+                        url = filePath;
+                    } else if (filePath.startsWith('users/')) {
+                        const storageRef = ref(this.storage, filePath);
+                        url = await getDownloadURL(storageRef);
+                    } else {
+                        throw new Error('Invalid file path');
+                    }
+                    
+                    const response = await fetch(url);
                     if (!response.ok) {
                         throw new Error(`Download failed: ${response.status}`);
                     }
-
+                    
                     const arrayBuffer = await response.arrayBuffer();
                     return new Uint8Array(arrayBuffer);
                 } catch (error) {
-                    console.error('Error downloading from Supabase:', error);
+                    console.error('Error downloading from Firebase Storage:', error);
                     throw error;
                 }
             }
 
             async deleteFile(filePath) {
+                await this.initialize();
+                
+                const { ref, deleteObject } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-storage.js');
+                
                 try {
-                    console.log(`Deleting ${filePath} from Supabase...`);
+                    console.log(`Deleting ${filePath} from Firebase Storage...`);
                     
-                    const response = await fetch(`${this.supabaseUrl}/storage/v1/object/${this.bucketName}/${filePath}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': `Bearer ${this.supabaseKey}`
-                        }
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`Delete failed: ${response.status}`);
+                    if (filePath.startsWith('users/')) {
+                        const storageRef = ref(this.storage, filePath);
+                        await deleteObject(storageRef);
+                        return true;
                     }
-
                     return true;
                 } catch (error) {
-                    console.error('Error deleting from Supabase:', error);
+                    console.error('Error deleting from Firebase Storage:', error);
                     throw error;
                 }
+            }
+        }
+
+        // Persistent Cache Manager for storing downloaded files
+        class PersistentCache {
+            constructor() {
+                this.dbName = 'MoCloudCache';
+                this.storeName = 'files';
+                this.db = null;
+                // Set cache size based on your needs - 30GB for storing multiple videos
+                this.maxCacheSize = 30 * 1024 * 1024 * 1024; // 30GB cache
+            }
+
+            async init() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, 1);
+                    
+                    request.onerror = () => reject(request.error);
+                    request.onsuccess = () => {
+                        this.db = request.result;
+                        resolve();
+                    };
+                    
+                    request.onupgradeneeded = (event) => {
+                        const db = event.target.result;
+                        if (!db.objectStoreNames.contains(this.storeName)) {
+                            db.createObjectStore(this.storeName, { keyPath: 'id' });
+                        }
+                    };
+                });
+            }
+
+            async getFile(fileId) {
+                if (!this.db) await this.init();
+                
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction([this.storeName], 'readonly');
+                    const store = transaction.objectStore(this.storeName);
+                    const request = store.get(fileId);
+                    
+                    request.onsuccess = () => {
+                        const result = request.result;
+                        if (result && result.data) {
+                            console.log('🎉 Using cached version - NO DOWNLOAD COST!');
+                            // Check if cache is expired (7 days)
+                            const age = Date.now() - result.timestamp;
+                            if (age < 7 * 24 * 60 * 60 * 1000) { // 7 days
+                                resolve(new Uint8Array(result.data));
+                            } else {
+                                console.log('Cache expired, need to re-download');
+                                this.removeFile(fileId); // Clean up expired cache
+                                resolve(null);
+                            }
+                        } else {
+                            resolve(null);
+                        }
+                    };
+                    
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            async saveFile(fileId, data) {
+                if (!this.db) await this.init();
+                
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction([this.storeName], 'readwrite');
+                    const store = transaction.objectStore(this.storeName);
+                    
+                    const request = store.put({
+                        id: fileId,
+                        data: data.buffer || data,
+                        timestamp: Date.now(),
+                        size: data.byteLength
+                    });
+                    
+                    request.onsuccess = () => {
+                        console.log('✅ File cached locally - future views are FREE!');
+                        resolve();
+                    };
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            async removeFile(fileId) {
+                if (!this.db) await this.init();
+                
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction([this.storeName], 'readwrite');
+                    const store = transaction.objectStore(this.storeName);
+                    const request = store.delete(fileId);
+                    
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            async clearAllCache() {
+                if (!this.db) await this.init();
+                
+                return new Promise((resolve, reject) => {
+                    const transaction = this.db.transaction([this.storeName], 'readwrite');
+                    const store = transaction.objectStore(this.storeName);
+                    const request = store.clear();
+                    
+                    request.onsuccess = () => {
+                        console.log('Cache cleared');
+                        resolve();
+                    };
+                    request.onerror = () => reject(request.error);
+                });
             }
         }
 
@@ -1286,9 +1410,10 @@
         class FileManager {
             constructor() {
                 this.encryptionManager = null;
-                this.storageManager = new SupabaseStorageManager();
+                this.storageManager = new FirebaseStorageManager(); // Changed to Firebase
+                this.cache = new PersistentCache(); // Add cache manager
                 this.files = [];
-                this.currentFilter = 'all'; // Track current filter
+                this.currentFilter = 'all';
             }
 
             async initialize() {
@@ -1319,14 +1444,20 @@
                     return;
                 }
 
-                // Quick check by name and size
+                // File size check
+                const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB max per file
+                if (file.size > MAX_FILE_SIZE) {
+                    alert(`File "${file.name}" is too large (${this.formatFileSize(file.size)}). Maximum file size is 5GB.`);
+                    return;
+                }
+
+                // Duplicate checks
                 const isDuplicateName = await this.checkForDuplicate(file);
                 if (isDuplicateName) {
                     console.log('Upload cancelled - duplicate file');
                     return;
                 }
 
-                // Deep check by file hash (for exact duplicate detection)
                 const hashCheck = await this.checkForDuplicateByHash(file);
                 if (hashCheck.isDuplicate) {
                     console.log('Upload cancelled - exact duplicate');
@@ -1337,27 +1468,66 @@
                 try {
                     console.log(`Uploading: ${file.name}`);
                     
-                    // Show upload progress
                     progressId = this.showUploadProgress(file.name);
-                    this.updateUploadProgress(progressId, 10, 'Encrypting file...');
                     
-                    // Encrypt file
-                    const encryptedData = await this.encryptionManager.encryptFile(file);
-                    this.updateUploadProgress(progressId, 40, 'Preparing upload...');
+                    let uploadResult;
+                    let isEncrypted = true;
+                    let streamingUrl = null;
                     
-                    // Generate unique file ID and path
-                    const fileId = this.generateFileId();
-                    const encryptedFileName = `${fileId}.enc`;
+                    // Decide whether to encrypt based on file type and size
+                    const shouldStream = file.type.startsWith('video/') && file.size > 100 * 1024 * 1024; // Videos over 100MB
+                    
+                    if (shouldStream) {
+                        // STREAMING PATH: Upload video without encryption
+                        console.log('Uploading video for streaming...');
+                        this.updateUploadProgress(progressId, 20, 'Preparing video for streaming...');
+                        
+                        // Generate filename that preserves extension for streaming
+                        const fileId = this.generateFileId();
+                        const extension = file.name.split('.').pop();
+                        const streamFileName = `${fileId}.${extension}`;
+                        
+                        // Upload original file directly
+                        uploadResult = await this.storageManager.uploadFile(
+                            file, // Pass file directly
+                            streamFileName,
+                            user.uid,
+                            (progress) => {
+                                const totalProgress = 20 + (progress * 0.7);
+                                this.updateUploadProgress(progressId, totalProgress, `Uploading video... ${Math.round(progress)}%`);
+                            }
+                        );
+                        
+                        isEncrypted = false;
+                        streamingUrl = uploadResult.fullPath;
+                        
+                    } else {
+                        // ENCRYPTION PATH: Encrypt then upload (for documents, images, small videos)
+                        console.log('Encrypting file for secure storage...');
+                        this.updateUploadProgress(progressId, 10, 'Encrypting file...');
+                        
+                        const encryptedData = await this.encryptionManager.encryptFile(file);
+                        this.updateUploadProgress(progressId, 40, 'Uploading encrypted file...');
+                        
+                        const fileId = this.generateFileId();
+                        uploadResult = await this.storageManager.uploadFile(
+                            encryptedData,
+                            `${fileId}.enc`,
+                            user.uid,
+                            (progress) => {
+                                const totalProgress = 40 + (progress * 0.5);
+                                this.updateUploadProgress(progressId, totalProgress, `Uploading... ${Math.round(progress)}%`);
+                            }
+                        );
+                        
+                        isEncrypted = true;
+                    }
 
-                    this.updateUploadProgress(progressId, 60, 'Uploading to cloud...');
-                    
-                    // Upload to Supabase
-                    const uploadResult = await this.storageManager.uploadFile(encryptedData, encryptedFileName, user.uid);
-                    this.updateUploadProgress(progressId, 80, 'Saving metadata...');
+                    this.updateUploadProgress(progressId, 90, 'Saving metadata...');
 
                     // Save metadata to Firestore
                     const fileMetadata = {
-                        id: fileId,
+                        id: this.generateFileId(),
                         userId: user.uid,
                         originalName: file.name,
                         size: file.size,
@@ -1365,7 +1535,9 @@
                         uploadDate: new Date(),
                         storagePath: uploadResult.path,
                         folder: this.determineFolder(file.type),
-                        hash: hashCheck.hash || null
+                        hash: hashCheck.hash || null,
+                        isEncrypted: isEncrypted,
+                        streamingUrl: streamingUrl // Store streaming URL if available
                     };
 
                     await addDoc(collection(db, 'files'), fileMetadata);
@@ -1378,8 +1550,9 @@
                     // Hide progress after delay
                     setTimeout(() => this.hideUploadProgress(progressId), 2000);
 
-                    console.log(`Upload complete: ${file.name}`);
+                    console.log(`Upload complete: ${file.name} (${isEncrypted ? 'encrypted' : 'streaming'})`);
                     return fileMetadata;
+                    
                 } catch (error) {
                     console.error('Upload error:', error);
                     alert(`Upload failed: ${error.message}`);
@@ -2192,15 +2365,30 @@
                 try {
                     console.log(`Opening image: ${file.originalName}`);
                     
-                    // Download and decrypt image
-                    const encryptedData = await this.storageManager.downloadFile(file.storagePath);
-                    const decryptedData = await this.encryptionManager.decryptFile(encryptedData);
+                    // Initialize cache if needed
+                    if (!this.cache) {
+                        this.cache = new PersistentCache();
+                        await this.cache.init();
+                    }
                     
-                    // Create blob URL
+                    // Check cache first
+                    let decryptedData = await this.cache.getFile(file.id);
+                    
+                    if (!decryptedData) {
+                        // Not cached, download
+                        console.log('Downloading image...');
+                        const encryptedData = await this.storageManager.downloadFile(file.storagePath);
+                        decryptedData = await this.encryptionManager.decryptFile(encryptedData);
+                        
+                        // Cache for future
+                        await this.cache.saveFile(file.id, decryptedData);
+                    } else {
+                        console.log('✅ Image loaded from cache!');
+                    }
+                    
+                    // Create blob URL and show
                     const blob = new Blob([decryptedData], { type: file.type });
                     const imageUrl = URL.createObjectURL(blob);
-                    
-                    // Create and show image modal
                     this.showImageModal(imageUrl, file.originalName, file);
                     
                 } catch (error) {
@@ -2369,20 +2557,47 @@
                 try {
                     console.log(`Opening video: ${file.originalName}`);
                     
-                    // Show loading
-                    this.showLoadingModal('Loading video...');
+                    // Initialize cache if needed
+                    if (!this.cache) {
+                        this.cache = new PersistentCache();
+                        await this.cache.init();
+                    }
                     
-                    // Download and decrypt video
-                    const encryptedData = await this.storageManager.downloadFile(file.storagePath);
-                    const decryptedData = await this.encryptionManager.decryptFile(encryptedData);
-                    
-                    // Create blob URL
-                    const blob = new Blob([decryptedData], { type: file.type });
-                    const videoUrl = URL.createObjectURL(blob);
-                    
-                    // Hide loading and show video modal
-                    this.hideLoadingModal();
-                    this.showVideoModal(videoUrl, file.originalName, file);
+                    // Check if video supports streaming (not encrypted)
+                    if (!file.isEncrypted && file.streamingUrl) {
+                        // STREAMING: Direct playback, no download
+                        console.log('🎬 Streaming video directly - minimal bandwidth usage!');
+                        this.showVideoModal(file.streamingUrl, file.originalName, file, true);
+                        
+                    } else {
+                        // ENCRYPTED: Check cache first, then download if needed
+                        console.log('🔒 Opening encrypted video...');
+                        
+                        // Check cache
+                        let decryptedData = await this.cache.getFile(file.id);
+                        
+                        if (!decryptedData) {
+                            // Not cached, need to download
+                            console.log('Downloading encrypted video...');
+                            this.showLoadingModal(`Downloading video (${this.formatFileSize(file.size)})...`);
+                            
+                            const encryptedData = await this.storageManager.downloadFile(file.storagePath);
+                            decryptedData = await this.encryptionManager.decryptFile(encryptedData);
+                            
+                            // Save to cache for future views
+                            this.showLoadingModal('Caching for offline viewing...');
+                            await this.cache.saveFile(file.id, decryptedData);
+                            
+                            this.hideLoadingModal();
+                        } else {
+                            console.log('✅ Loaded from cache - no download cost!');
+                        }
+                        
+                        // Create blob URL and play
+                        const blob = new Blob([decryptedData], { type: file.type });
+                        const videoUrl = URL.createObjectURL(blob);
+                        this.showVideoModal(videoUrl, file.originalName, file, false);
+                    }
                     
                 } catch (error) {
                     this.hideLoadingModal();
@@ -2391,7 +2606,7 @@
                 }
             }
 
-            showVideoModal(videoUrl, fileName, fileMetadata) {
+            showVideoModal(videoUrl, fileName, fileMetadata, isStreaming) {
                 // Remove existing modal if present
                 const existingModal = document.getElementById('videoModal');
                 if (existingModal) {
@@ -2402,11 +2617,34 @@
                 const modal = document.createElement('div');
                 modal.id = 'videoModal';
                 modal.className = 'file-modal';
+                
+                // Add streaming indicator
+                const streamingBadge = isStreaming ? 
+                    `<span style="background: linear-gradient(135deg, var(--accent-teal), #1DD1A1); 
+                                color: white; 
+                                padding: 0.25rem 0.75rem; 
+                                border-radius: 1rem; 
+                                font-size: var(--small-font-size);
+                                margin-left: 1rem;">
+                        <i class="fas fa-wifi"></i> Streaming
+                    </span>` : 
+                    `<span style="background: linear-gradient(135deg, var(--primary-gold), var(--gold-light)); 
+                                color: var(--midnight-deep); 
+                                padding: 0.25rem 0.75rem; 
+                                border-radius: 1rem; 
+                                font-size: var(--small-font-size);
+                                margin-left: 1rem;">
+                        <i class="fas fa-lock"></i> Encrypted
+                    </span>`;
+                
                 modal.innerHTML = `
                     <div class="modal-backdrop"></div>
                     <div class="modal-content video-modal-content" style="max-width: 90vw; max-height: 90vh;">
                         <div class="modal-header">
-                            <h3>${fileName}</h3>
+                            <div style="display: flex; align-items: center;">
+                                <h3>${fileName}</h3>
+                                ${streamingBadge}
+                            </div>
                             <button class="modal-close" aria-label="Close">
                                 <i class="fas fa-times"></i>
                             </button>
@@ -2421,48 +2659,46 @@
                             <button class="modal-btn download-btn">
                                 <i class="fas fa-download"></i> Download
                             </button>
+                            ${!isStreaming ? `<button class="modal-btn clear-cache-btn" style="background: linear-gradient(135deg, #ff6b6b, #ff8c8c); color: white;">
+                                <i class="fas fa-trash"></i> Clear Cache
+                            </button>` : ''}
                         </div>
                     </div>
                 `;
 
                 document.body.appendChild(modal);
-
-                // Show modal with animation
                 setTimeout(() => modal.classList.add('show'), 10);
 
-                // Get video element and set up proper sizing
+                // Get video element and handle sizing
                 const video = modal.querySelector('video');
                 
-                // Handle video metadata loaded
                 video.addEventListener('loadedmetadata', () => {
                     const aspectRatio = video.videoWidth / video.videoHeight;
-                    
-                    // Handle portrait videos
                     if (aspectRatio < 1) {
-                        // Portrait video
                         video.style.maxWidth = '50vh';
                         video.style.height = 'auto';
                     } else {
-                        // Landscape video
                         video.style.maxWidth = '100%';
                         video.style.height = 'auto';
                     }
                 });
 
-                // Force load metadata
                 video.load();
 
                 // Event listeners
                 const closeBtn = modal.querySelector('.modal-close');
                 const backdrop = modal.querySelector('.modal-backdrop');
                 const downloadBtn = modal.querySelector('.download-btn');
+                const clearCacheBtn = modal.querySelector('.clear-cache-btn');
 
                 const closeModal = () => {
-                    video.pause(); // Stop video playback
+                    video.pause();
                     modal.classList.remove('show');
                     setTimeout(() => {
                         modal.remove();
-                        URL.revokeObjectURL(videoUrl); // Clean up blob URL
+                        if (!isStreaming) {
+                            URL.revokeObjectURL(videoUrl); // Clean up blob URL
+                        }
                     }, 300);
                 };
 
@@ -2472,6 +2708,13 @@
                 downloadBtn.addEventListener('click', () => {
                     this.downloadFile(fileMetadata);
                 });
+                
+                if (clearCacheBtn) {
+                    clearCacheBtn.addEventListener('click', async () => {
+                        await this.cache.removeFile(fileMetadata.id);
+                        alert('Cache cleared for this video');
+                    });
+                }
 
                 // Close on Escape key
                 document.addEventListener('keydown', function escapeHandler(e) {
