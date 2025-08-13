@@ -2411,8 +2411,8 @@
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
-                        <div class="modal-body" style="padding: 1rem;">
-                            <video controls style="width: 100%; max-height: 70vh; border-radius: 0.5rem;" preload="metadata">
+                        <div class="modal-body" style="padding: 1rem; display: flex; justify-content: center; align-items: center; min-height: 400px;">
+                            <video controls style="max-width: 100%; max-height: 70vh; border-radius: 0.5rem; display: block;" preload="metadata" playsinline>
                                 <source src="${videoUrl}" type="${fileMetadata.type}">
                                 Your browser does not support the video tag.
                             </video>
@@ -2430,11 +2430,32 @@
                 // Show modal with animation
                 setTimeout(() => modal.classList.add('show'), 10);
 
+                // Get video element and set up proper sizing
+                const video = modal.querySelector('video');
+                
+                // Handle video metadata loaded
+                video.addEventListener('loadedmetadata', () => {
+                    const aspectRatio = video.videoWidth / video.videoHeight;
+                    
+                    // Handle portrait videos
+                    if (aspectRatio < 1) {
+                        // Portrait video
+                        video.style.maxWidth = '50vh';
+                        video.style.height = 'auto';
+                    } else {
+                        // Landscape video
+                        video.style.maxWidth = '100%';
+                        video.style.height = 'auto';
+                    }
+                });
+
+                // Force load metadata
+                video.load();
+
                 // Event listeners
                 const closeBtn = modal.querySelector('.modal-close');
                 const backdrop = modal.querySelector('.modal-backdrop');
                 const downloadBtn = modal.querySelector('.download-btn');
-                const video = modal.querySelector('video');
 
                 const closeModal = () => {
                     video.pause(); // Stop video playback
