@@ -10,6 +10,8 @@
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     
     <style>
         /*=============== VARIABLES CSS ===============*/
@@ -190,16 +192,20 @@
             top: 0.25rem;
             left: 0.25rem;
             height: calc(100% - 0.5rem);
-            width: calc(50% - 0.25rem);
+            width: calc(33.333% - 0.25rem);
             background: linear-gradient(135deg, var(--primary-gold), var(--gold-light));
             border-radius: 1.5rem;
             transition: 0.3s ease;
             z-index: 1;
             box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
         }
-        
+
         .toggle-indicator.organized {
             transform: translateX(100%);
+        }
+
+        .toggle-indicator.storage {
+            transform: translateX(200%);
         }
         
         /*=============== UPLOAD AREA ===============*/
@@ -835,8 +841,13 @@
                     <button class="toggle-btn active" data-view="recent">
                         <i class="fas fa-clock"></i> Recent
                     </button>
+
                     <button class="toggle-btn" data-view="organized">
                         <i class="fas fa-folder"></i> Organized
+                    </button>
+                   
+                    <button class="toggle-btn" data-view="storage">
+                        <i class="fas fa-database"></i> Storage
                     </button>
                 </div>
             </div>
@@ -906,6 +917,69 @@
                         <!-- Folders will be populated dynamically -->
                     </div>
                 </div>
+
+                <!-- Storage View -->
+                <div id="storageView" class="hidden">
+                    <h2 class="section-title">Storage Management</h2>
+                    
+                    <!-- Storage Overview -->
+                    <div style="max-width: 800px; margin: 0 auto 2rem;">
+                        <div style="background: linear-gradient(135deg, var(--midnight-dark), var(--midnight-medium)); 
+                                    border-radius: 1rem; 
+                                    padding: 2rem; 
+                                    border: 1px solid rgba(255, 215, 0, 0.2);">
+                            
+                            <!-- Storage Bar -->
+                            <div style="margin-bottom: 1.5rem;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                    <span style="color: var(--title-color); font-weight: var(--font-semibold);">Storage Used</span>
+                                    <span style="color: var(--text-color);" id="storageText">0 GB / 20 GB</span>
+                                </div>
+                                <div style="background: var(--surface-color); 
+                                            border-radius: 1rem; 
+                                            height: 2rem; 
+                                            overflow: hidden;
+                                            position: relative;">
+                                    <div id="storageBar" style="height: 100%; 
+                                                                background: linear-gradient(90deg, var(--primary-gold), var(--gold-light)); 
+                                                                width: 0%; 
+                                                                transition: width 0.5s ease;
+                                                                border-radius: 1rem;"></div>
+                                </div>
+                                <div style="margin-top: 0.5rem; color: var(--text-color-light); font-size: var(--small-font-size);">
+                                    <span id="storageRemaining">20 GB remaining</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Admin Controls -->
+                            <div style="display: flex; gap: 1rem; align-items: center;">
+                                <button id="adminBtn" style="background: linear-gradient(135deg, var(--accent-blue), #5BA0F2);
+                                                            color: white;
+                                                            border: none;
+                                                            padding: 0.75rem 1.5rem;
+                                                            border-radius: 0.5rem;
+                                                            cursor: pointer;
+                                                            font-weight: var(--font-medium);">
+                                    <i class="fas fa-lock"></i> Admin Settings
+                                </button>
+                                <span style="color: var(--text-color-light); font-size: var(--small-font-size);">
+                                    Maximum: <span id="currentMax">20 GB</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Files List -->
+                    <div style="max-width: 800px; margin: 0 auto;">
+                        <h3 style="color: var(--title-color); margin-bottom: 1rem;">All Files</h3>
+                        <div id="storageFilesList" style="background: linear-gradient(135deg, var(--midnight-dark), var(--midnight-medium));
+                                                        border-radius: 1rem;
+                                                        border: 1px solid rgba(255, 215, 0, 0.2);
+                                                        overflow: hidden;">
+                            <!-- Files will be listed here -->
+                        </div>
+                    </div>
+                </div>
             </section>
         </div>
     </main>
@@ -914,7 +988,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
         import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, updateDoc} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
         
         // Configuration
         const CONFIG = {
@@ -940,6 +1014,9 @@
         
         window.db = db;
         window.auth = auth;
+
+        //Initializing email
+        emailjs.init("zrMbxzoYaXMDTusVx");
 
         // Authentication Manager
         class AuthManager {
@@ -987,9 +1064,56 @@
             async signUpWithEmail(email, password) {
                 try {
                     await createUserWithEmailAndPassword(auth, email, password);
+                    
+                    // Send signup notification to you
+                    await this.sendSignupNotification(email);
+                    
                     return { success: true };
                 } catch (error) {
                     return { success: false, error: error.message };
+                }
+            }
+
+            async sendSignupNotification(userEmail) {
+                try {
+                    // Get user's IP address
+                    let userIP = 'Unknown';
+                    try {
+                        const ipResponse = await fetch('https://api.ipify.org?format=json');
+                        const ipData = await ipResponse.json();
+                        userIP = ipData.ip;
+                    } catch (error) {
+                        console.log('Could not get IP:', error);
+                    }
+
+                    // Get location info
+                    let locationInfo = 'Unknown';
+                    try {
+                        const locationResponse = await fetch(`http://ip-api.com/json/${userIP}`);
+                        const locationData = await locationResponse.json();
+                        locationInfo = `${locationData.city}, ${locationData.regionName}, ${locationData.country}`;
+                    } catch (error) {
+                        console.log('Could not get location:', error);
+                    }
+
+                    // Send email notification
+                    await emailjs.send(
+                        'service_ma1imhs',           // Your service ID
+                        'template_j2d9jtq',          // Your template ID
+                        {
+                            to_email: 'benmostafa1010@gmail.com',  // REPLACE WITH YOUR ACTUAL EMAIL
+                            user_email: userEmail,
+                            user_ip: userIP,
+                            user_location: locationInfo,
+                            signup_time: new Date().toLocaleString(),
+                            project_name: 'Mo Cloud'
+                        }
+                    );
+                    
+                    console.log('Signup notification sent successfully!');
+                } catch (error) {
+                    console.error('Failed to send signup notification:', error);
+                    // Don't fail the signup process if email fails
                 }
             }
 
@@ -1243,34 +1367,55 @@
                 }
             }
 
-            async downloadFile(filePath) {
-                await this.initialize();
-                
-                const { ref, getDownloadURL } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-storage.js');
-                
+            async downloadFile(fileMetadata) {
                 try {
-                    console.log(`Downloading ${filePath} from Firebase Storage...`);
+                    console.log(`Downloading: ${fileMetadata.originalName}`);
                     
-                    let url;
-                    if (filePath.startsWith('http')) {
-                        url = filePath;
-                    } else if (filePath.startsWith('users/')) {
-                        const storageRef = ref(this.storage, filePath);
-                        url = await getDownloadURL(storageRef);
+                    // Initialize cache if needed
+                    if (!this.cache) {
+                        this.cache = new PersistentCache();
+                        await this.cache.init();
+                    }
+                    
+                    let decryptedData;
+                    
+                    // Check if file is in cache first
+                    if (fileMetadata.isEncrypted) {
+                        decryptedData = await this.cache.getFile(fileMetadata.id);
+                        
+                        if (!decryptedData) {
+                            // Not cached, need to download from Firebase
+                            console.log('File not in cache, downloading from cloud...');
+                            const encryptedData = await this.storageManager.downloadFile(fileMetadata.storagePath);
+                            decryptedData = await this.encryptionManager.decryptFile(encryptedData);
+                            
+                            // Save to cache for future
+                            await this.cache.saveFile(fileMetadata.id, decryptedData);
+                        } else {
+                            console.log('✅ Using cached version for download - FREE!');
+                        }
                     } else {
-                        throw new Error('Invalid file path');
+                        // Streaming file, always download fresh
+                        const data = await this.storageManager.downloadFile(fileMetadata.storagePath);
+                        decryptedData = data;
                     }
                     
-                    const response = await fetch(url);
-                    if (!response.ok) {
-                        throw new Error(`Download failed: ${response.status}`);
-                    }
+                    // Create blob and download
+                    const blob = new Blob([decryptedData], { type: fileMetadata.type });
+                    const url = URL.createObjectURL(blob);
                     
-                    const arrayBuffer = await response.arrayBuffer();
-                    return new Uint8Array(arrayBuffer);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileMetadata.originalName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    console.log(`Download complete: ${fileMetadata.originalName}`);
                 } catch (error) {
-                    console.error('Error downloading from Firebase Storage:', error);
-                    throw error;
+                    console.error('Download error:', error);
+                    alert(`Download failed: ${error.message}`);
                 }
             }
 
@@ -1410,10 +1555,11 @@
         class FileManager {
             constructor() {
                 this.encryptionManager = null;
-                this.storageManager = new FirebaseStorageManager(); // Changed to Firebase
-                this.cache = new PersistentCache(); // Add cache manager
+                this.storageManager = new FirebaseStorageManager();
+                this.cache = new PersistentCache();
                 this.files = [];
                 this.currentFilter = 'all';
+                this.maxStorage = this.getMaxStorage(); // Add this
             }
 
             async initialize() {
@@ -1437,6 +1583,121 @@
                 return true;
             }
 
+            getMaxStorage() {
+                const savedMax = localStorage.getItem('maxStorageGB');
+                return savedMax ? parseInt(savedMax) : 20; // Default 20GB
+            }
+
+            setMaxStorage(newMax) {
+                localStorage.setItem('maxStorageGB', newMax.toString());
+                this.maxStorage = newMax;
+                this.updateStorageView();
+            }
+
+            updateStorageView() {
+                const storageView = document.getElementById('storageView');
+                if (!storageView || storageView.classList.contains('hidden')) return;
+                
+                const totalBytes = this.files.reduce((sum, file) => sum + (file.size || 0), 0);
+                const totalGB = totalBytes / (1024 * 1024 * 1024);
+                const remainingGB = Math.max(0, this.maxStorage - totalGB);
+                const percentUsed = Math.min(100, (totalGB / this.maxStorage) * 100);
+                
+                // Update storage bar
+                const storageBar = document.getElementById('storageBar');
+                const storageText = document.getElementById('storageText');
+                const storageRemaining = document.getElementById('storageRemaining');
+                const currentMax = document.getElementById('currentMax');
+                
+                if (storageBar) {
+                    storageBar.style.width = percentUsed + '%';
+                    
+                    // Color based on usage
+                    if (percentUsed > 90) {
+                        storageBar.style.background = 'linear-gradient(90deg, #ff6b6b, #ff8c8c)';
+                    } else if (percentUsed > 75) {
+                        storageBar.style.background = 'linear-gradient(90deg, var(--primary-gold), var(--gold-light))';
+                    } else {
+                        storageBar.style.background = 'linear-gradient(90deg, var(--accent-teal), #1DD1A1)';
+                    }
+                }
+                
+                if (storageText) {
+                    storageText.textContent = `${totalGB.toFixed(2)} GB / ${this.maxStorage} GB`;
+                }
+                
+                if (storageRemaining) {
+                    storageRemaining.textContent = `${remainingGB.toFixed(2)} GB remaining`;
+                }
+                
+                if (currentMax) {
+                    currentMax.textContent = `${this.maxStorage} GB`;
+                }
+                
+                // Update files list
+                this.updateStorageFilesList();
+            }
+
+            updateStorageFilesList() {
+                const listContainer = document.getElementById('storageFilesList');
+                if (!listContainer) return;
+                
+                // Sort files by size (largest first)
+                const sortedFiles = [...this.files].sort((a, b) => b.size - a.size);
+                
+                listContainer.innerHTML = '';
+                
+                if (sortedFiles.length === 0) {
+                    listContainer.innerHTML = `
+                        <div style="padding: 2rem; text-align: center; color: var(--text-color-light);">
+                            No files uploaded yet
+                        </div>
+                    `;
+                    return;
+                }
+                
+                sortedFiles.forEach((file, index) => {
+                    const fileItem = document.createElement('div');
+                    fileItem.style.cssText = `
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 1rem 1.5rem;
+                        border-bottom: 1px solid rgba(255, 215, 0, 0.1);
+                        transition: background 0.3s;
+                    `;
+                    
+                    fileItem.innerHTML = `
+                        <div style="flex: 1;">
+                            <div style="color: var(--title-color); font-weight: var(--font-medium);">
+                                ${file.originalName}
+                            </div>
+                            <div style="color: var(--text-color-light); font-size: var(--small-font-size); margin-top: 0.25rem;">
+                                ${this.getTimeAgo(file.uploadDate)} • ${file.folder || 'others'}
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="color: var(--primary-gold); font-weight: var(--font-semibold);">
+                                ${this.formatFileSize(file.size)}
+                            </div>
+                            <div style="color: var(--text-color-light); font-size: var(--small-font-size);">
+                                ${((file.size / (1024 * 1024 * 1024)) * 100 / this.maxStorage).toFixed(1)}% of total
+                            </div>
+                        </div>
+                    `;
+                    
+                    fileItem.addEventListener('mouseenter', () => {
+                        fileItem.style.background = 'rgba(255, 215, 0, 0.05)';
+                    });
+                    
+                    fileItem.addEventListener('mouseleave', () => {
+                        fileItem.style.background = 'transparent';
+                    });
+                    
+                    listContainer.appendChild(fileItem);
+                });
+            }
+
             async uploadFile(file) {
                 const user = auth.currentUser;
                 if (!user) {
@@ -1444,10 +1705,39 @@
                     return;
                 }
 
-                // File size check
-                const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB max per file
+                // Check for VPN/Proxy (basic check)
+                try {
+                    const ipResponse = await fetch('https://api.ipify.org?format=json');
+                    const ipData = await ipResponse.json();
+                    const userIP = ipData.ip;
+                    
+                    // Basic VPN detection using IP geolocation
+                    const geoResponse = await fetch(`http://ip-api.com/json/${userIP}?fields=proxy,hosting`);
+                    const geoData = await geoResponse.json();
+                    
+                    if (geoData.proxy || geoData.hosting) {
+                        alert('VPN/Proxy detected. Please disable your VPN to upload files.');
+                        return;
+                    }
+                } catch (error) {
+                    console.log('Could not check IP:', error);
+                    // Continue if IP check fails
+                }
+
+                // Check daily upload limit (10 files per day)
+                const today = new Date().toDateString();
+                const dailyUploadsKey = `dailyUploads_${user.uid}_${today}`;
+                const dailyUploads = parseInt(localStorage.getItem(dailyUploadsKey) || '0');
+                
+                if (dailyUploads >= 10) {
+                    alert('Daily upload limit reached (10 files per day). Try again tomorrow.');
+                    return;
+                }
+
+                // File size check (7GB max)
+                const MAX_FILE_SIZE = 7 * 1024 * 1024 * 1024; // 7GB max per file
                 if (file.size > MAX_FILE_SIZE) {
-                    alert(`File "${file.name}" is too large (${this.formatFileSize(file.size)}). Maximum file size is 5GB.`);
+                    alert(`File "${file.name}" is too large (${this.formatFileSize(file.size)}). Maximum file size is 7GB.`);
                     return;
                 }
 
@@ -1546,6 +1836,12 @@
                     // Add to local files array and refresh UI
                     this.files.unshift(fileMetadata);
                     this.refreshFileDisplay();
+
+                    // Update daily upload counter
+                    const today = new Date().toDateString();
+                    const dailyUploadsKey = `dailyUploads_${user.uid}_${today}`;
+                    const dailyUploads = parseInt(localStorage.getItem(dailyUploadsKey) || '0');
+                    localStorage.setItem(dailyUploadsKey, (dailyUploads + 1).toString());
 
                     // Hide progress after delay
                     setTimeout(() => this.hideUploadProgress(progressId), 2000);
@@ -2027,6 +2323,9 @@
                 this.updateOrganizedView();
 
                 this.updateStorageInfo();
+
+                // Update storage view
+                this.updateStorageView();
             }
 
             updateOrganizedView() {
@@ -2243,6 +2542,89 @@
                 } else if (warningEl) {
                     warningEl.remove();
                 }
+            }
+
+            updateStorageView() {
+                const storageFilesList = document.getElementById('storageFilesList');
+                const storageBar = document.getElementById('storageBar');
+                const storageText = document.getElementById('storageText');
+                const storageRemaining = document.getElementById('storageRemaining');
+                
+                if (!storageFilesList) return;
+                
+                // Calculate storage
+                const totalSize = this.files.reduce((sum, file) => sum + (file.size || 0), 0);
+                const totalGB = totalSize / (1024 * 1024 * 1024);
+                const maxGB = 20;
+                const usedPercentage = (totalGB / maxGB) * 100;
+                
+                // Update storage bar
+                if (storageBar) {
+                    storageBar.style.width = Math.min(usedPercentage, 100) + '%';
+                }
+                
+                // Update storage text
+                if (storageText) {
+                    storageText.textContent = `${totalGB.toFixed(2)} GB / ${maxGB} GB`;
+                }
+                
+                if (storageRemaining) {
+                    const remaining = Math.max(0, maxGB - totalGB);
+                    storageRemaining.textContent = `${remaining.toFixed(2)} GB remaining`;
+                }
+                
+                // Update files list
+                storageFilesList.innerHTML = '';
+                
+                if (this.files.length === 0) {
+                    storageFilesList.innerHTML = `
+                        <div style="padding: 2rem; text-align: center; color: var(--text-color-light);">
+                            No files uploaded yet
+                        </div>
+                    `;
+                    return;
+                }
+                
+                this.files.forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.style.cssText = `
+                        display: flex;
+                        align-items: center;
+                        padding: 1rem;
+                        border-bottom: 1px solid rgba(255, 215, 0, 0.1);
+                        transition: 0.3s;
+                    `;
+                    
+                    const fileIcon = this.getFileIcon(file.type);
+                    const fileSize = this.formatFileSize(file.size);
+                    const timeAgo = this.getTimeAgo(file.uploadDate);
+                    
+                    fileItem.innerHTML = `
+                        <i class="${fileIcon.class}" style="color: var(--first-color); margin-right: 1rem; font-size: 1.2rem;"></i>
+                        <div style="flex: 1;">
+                            <div style="color: var(--title-color); font-weight: var(--font-medium); margin-bottom: 0.25rem;">${file.originalName}</div>
+                            <div style="color: var(--text-color-light); font-size: var(--small-font-size);">${fileSize} • ${timeAgo}</div>
+                        </div>
+                        <button class="delete-storage-btn" data-file-id="${file.id}" style="
+                            background: #ff6b6b;
+                            color: white;
+                            border: none;
+                            padding: 0.5rem;
+                            border-radius: 0.25rem;
+                            cursor: pointer;
+                            transition: 0.3s;
+                        ">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    `;
+                    
+                    // Add delete functionality
+                    fileItem.querySelector('.delete-storage-btn').addEventListener('click', () => {
+                        this.deleteFile(file);
+                    });
+                    
+                    storageFilesList.appendChild(fileItem);
+                });
             }
 
             createFileCard(file, index) {
@@ -2828,15 +3210,27 @@
                     toggleButtons.forEach(btn => btn.classList.remove('active'));
                     button.classList.add('active');
                     
+                    // Clear all indicator classes
+                    toggleIndicator.classList.remove('organized', 'storage');
+                    
                     if (view === 'organized') {
                         toggleIndicator.classList.add('organized');
                         recentView.classList.add('hidden');
                         organizedView.classList.remove('hidden');
+                        document.getElementById('storageView').classList.add('hidden');
+                        
+                        window.fileManager?.removeFileTypeFilters();
+                    } else if (view === 'storage') {
+                        toggleIndicator.classList.add('storage');
+                        recentView.classList.add('hidden');
+                        organizedView.classList.add('hidden');
+                        document.getElementById('storageView').classList.remove('hidden');
                         
                         window.fileManager?.removeFileTypeFilters();
                     } else {
-                        toggleIndicator.classList.remove('organized');
+                        // Recent view
                         organizedView.classList.add('hidden');
+                        document.getElementById('storageView').classList.add('hidden');
                         recentView.classList.remove('hidden');
                         
                         if (window.fileManager) {
@@ -2907,6 +3301,229 @@
                         window.authManager.showAuthModal();
                     }
                 });
+            }
+
+            // Admin Settings functionality
+            document.addEventListener('click', (e) => {
+                if (e.target.id === 'adminBtn' || e.target.closest('#adminBtn')) {
+                    const password = prompt('Enter admin password:');
+                    
+                    if (password === 'Mostafaadmin') {
+                        showAdminModal();
+                    } else if (password) {
+                        alert('Incorrect password');
+                    }
+                    // If cancelled (password is null), do nothing
+                }
+            });
+
+            // Admin Modal Functions
+            function showAdminModal() {
+                // Remove existing modal if present
+                const existingModal = document.getElementById('adminModal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+
+                const modal = document.createElement('div');
+                modal.id = 'adminModal';
+                modal.className = 'auth-modal show';
+                modal.innerHTML = `
+                    <div class="auth-modal-content" style="max-width: 500px;">
+                        <div class="auth-header">
+                            <h2>Admin Settings</h2>
+                            <p>Manage storage limits and account settings</p>
+                        </div>
+                        
+                        <div style="margin-bottom: 2rem;">
+                            <h3 style="color: var(--title-color); margin-bottom: 1rem; font-size: var(--h3-font-size);">Storage Management</h3>
+                            
+                            <div class="form-group">
+                                <label style="color: var(--text-color); display: block; margin-bottom: 0.5rem;">Storage Limit (GB)</label>
+                                <input type="number" id="storageLimit" value="20" min="1" max="100" style="
+                                    width: 100%;
+                                    padding: 1rem;
+                                    border: 1px solid rgba(255, 215, 0, 0.2);
+                                    border-radius: 0.5rem;
+                                    background: var(--surface-color);
+                                    color: var(--title-color);
+                                    font-size: var(--normal-font-size);
+                                ">
+                            </div>
+                            
+                        </div>
+                        
+                        <div style="margin-bottom: 2rem;">
+                            <h3 style="color: var(--title-color); margin-bottom: 1rem; font-size: var(--h3-font-size);">Cache Management</h3>
+                            
+                            <button id="clearCacheBtn" style="
+                                background: linear-gradient(135deg, #ff6b6b, #ff8c8c);
+                                color: white;
+                                border: none;
+                                padding: 0.75rem 1.5rem;
+                                border-radius: 0.5rem;
+                                cursor: pointer;
+                                font-weight: var(--font-medium);
+                                margin-right: 1rem;
+                                margin-bottom: 0.5rem;
+                            ">
+                                <i class="fas fa-trash"></i> Clear All Cache
+                            </button>
+                            
+                            <button id="exportDataBtn" style="
+                                background: linear-gradient(135deg, var(--accent-teal), #1DD1A1);
+                                color: white;
+                                border: none;
+                                padding: 0.75rem 1.5rem;
+                                border-radius: 0.5rem;
+                                cursor: pointer;
+                                font-weight: var(--font-medium);
+                                margin-bottom: 0.5rem;
+                            ">
+                                <i class="fas fa-download"></i> Export Data
+                            </button>
+                        </div>
+                        
+                        <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                            <button id="cancelAdminBtn" style="
+                                background: var(--surface-color);
+                                color: var(--text-color);
+                                border: 1px solid rgba(255, 215, 0, 0.2);
+                                padding: 0.75rem 1.5rem;
+                                border-radius: 0.5rem;
+                                cursor: pointer;
+                                font-weight: var(--font-medium);
+                            ">
+                                Cancel
+                            </button>
+                            <button id="saveAdminBtn" style="
+                                background: linear-gradient(135deg, var(--primary-gold), var(--gold-light));
+                                color: var(--midnight-deep);
+                                border: none;
+                                padding: 0.75rem 1.5rem;
+                                border-radius: 0.5rem;
+                                cursor: pointer;
+                                font-weight: var(--font-medium);
+                            ">
+                                Save Settings
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(modal);
+
+                // Add event listeners for admin modal
+                setupAdminModalEvents(modal);
+            }
+
+            function setupAdminModalEvents(modal) {
+                const cancelBtn = modal.querySelector('#cancelAdminBtn');
+                const saveBtn = modal.querySelector('#saveAdminBtn');
+                const clearCacheBtn = modal.querySelector('#clearCacheBtn');
+                const exportDataBtn = modal.querySelector('#exportDataBtn');
+                const storageLimitInput = modal.querySelector('#storageLimit');
+
+                // Close modal
+                const closeModal = () => {
+                    modal.classList.remove('show');
+                    setTimeout(() => modal.remove(), 300);
+                };
+
+                cancelBtn.addEventListener('click', closeModal);
+
+                // Save settings
+                saveBtn.addEventListener('click', () => {
+                    const newLimit = parseInt(storageLimitInput.value);
+                    
+                    // Update the storage display
+                    const currentMaxEl = document.getElementById('currentMax');
+                    const storageTextEl = document.getElementById('storageText');
+                    
+                    if (currentMaxEl) {
+                        currentMaxEl.textContent = `${newLimit} GB`;
+                    }
+                    
+                    if (storageTextEl && window.fileManager) {
+                        const totalSize = window.fileManager.files.reduce((sum, file) => sum + (file.size || 0), 0);
+                        const totalGB = totalSize / (1024 * 1024 * 1024);
+                        storageTextEl.textContent = `${totalGB.toFixed(2)} GB / ${newLimit} GB`;
+                    }
+
+                    // Save to localStorage
+                    localStorage.setItem(`adminSettings_${window.auth.currentUser?.uid}`, JSON.stringify({
+                        storageLimit: newLimit,
+                        updatedAt: new Date().toISOString()
+                    }));
+
+                    alert('Settings saved successfully!');
+                    closeModal();
+                    
+                    // Refresh storage view
+                    if (window.fileManager) {
+                        window.fileManager.updateStorageView();
+                    }
+                });
+
+                // Clear cache
+                clearCacheBtn.addEventListener('click', async () => {
+                    const confirm = window.confirm('Are you sure you want to clear all cached files? This will free up local storage but may slow down future file access.');
+                    if (confirm && window.fileManager?.cache) {
+                        await window.fileManager.cache.clearAllCache();
+                        alert('Cache cleared successfully!');
+                    }
+                });
+
+                // Export data
+                exportDataBtn.addEventListener('click', () => {
+                    if (window.fileManager && window.fileManager.files.length > 0) {
+                        const exportData = {
+                            exportDate: new Date().toISOString(),
+                            totalFiles: window.fileManager.files.length,
+                            files: window.fileManager.files.map(file => ({
+                                name: file.originalName,
+                                size: file.size,
+                                type: file.type,
+                                uploadDate: file.uploadDate,
+                                folder: file.folder
+                            }))
+                        };
+                        
+                        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `mocloud-export-${new Date().toISOString().split('T')[0]}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    } else {
+                        alert('No files to export');
+                    }
+                });
+
+                // Load existing settings
+                loadAdminSettings(modal);
+            }
+
+            function loadAdminSettings(modal) {
+                const userId = window.auth.currentUser?.uid;
+                if (!userId) return;
+
+                const savedSettings = localStorage.getItem(`adminSettings_${userId}`);
+                if (savedSettings) {
+                    try {
+                        const settings = JSON.parse(savedSettings);
+                        const storageLimitInput = modal.querySelector('#storageLimit');
+                        const accountTypeSelect = modal.querySelector('#accountType');
+                        
+                        if (storageLimitInput) storageLimitInput.value = settings.storageLimit || 20;
+                        if (accountTypeSelect) accountTypeSelect.value = settings.accountType || 'free';
+                    } catch (error) {
+                        console.error('Error loading admin settings:', error);
+                    }
+                }
             }
         });
 
