@@ -987,7 +987,7 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, updateDoc} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, where, updateDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendEmailVerification } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
         
         // Configuration
@@ -1054,6 +1054,19 @@
 
             async signInWithEmail(email, password) {
                 try {
+                    // Check if email is blocked
+                    const blockedEmails = JSON.parse(localStorage.getItem('blockedEmails') || '[]');
+                    if (blockedEmails.includes(email)) {
+                        return { success: false, error: 'You have been blocked' };
+                    }
+
+                    // Check if device is blocked
+                    const deviceFingerprint = await generateDeviceFingerprint();
+                    const blockedDevices = JSON.parse(localStorage.getItem('blockedDevices') || '[]');
+                    if (blockedDevices.includes(deviceFingerprint)) {
+                        return { success: false, error: 'Access blocked from this device' };
+                    }
+
                     await signInWithEmailAndPassword(auth, email, password);
                     return { success: true };
                 } catch (error) {
@@ -1063,7 +1076,29 @@
 
             async signUpWithEmail(email, password) {
                 try {
-                    await createUserWithEmailAndPassword(auth, email, password);
+                    // Check if email is blocked
+                    const blockedEmails = JSON.parse(localStorage.getItem('blockedEmails') || '[]');
+                    if (blockedEmails.includes(email)) {
+                        return { success: false, error: 'You have been blocked' };
+                    }
+
+                    // Check if device is blocked
+                    const deviceFingerprint = await generateDeviceFingerprint();
+                    const blockedDevices = JSON.parse(localStorage.getItem('blockedDevices') || '[]');
+                    if (blockedDevices.includes(deviceFingerprint)) {
+                        return { success: false, error: 'Access blocked from this device' };
+                    }
+
+                    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                    
+                    // Store user info in Firestore
+                    await addDoc(collection(window.db, 'users'), {
+                        userId: userCredential.user.uid,
+                        email: email,
+                        deviceFingerprint: deviceFingerprint,
+                        deviceInfo: `${navigator.platform} - ${navigator.userAgent.includes('Chrome') ? 'Chrome' : navigator.userAgent.includes('Firefox') ? 'Firefox' : navigator.userAgent.includes('Safari') ? 'Safari' : 'Other'}`,
+                        signupDate: new Date().toISOString()
+                    });
                     
                     // Send signup notification to you
                     await this.sendSignupNotification(email);
@@ -1098,10 +1133,10 @@
 
                     // Send email notification
                     await emailjs.send(
-                        'service_ma1imhs',           // Your service ID
-                        'template_j2d9jtq',          // Your template ID
+                        'service_ma1imhs',           // service ID
+                        'template_j2d9jiq',          // template ID
                         {
-                            to_email: 'benmostafa1010@gmail.com',  // REPLACE WITH YOUR ACTUAL EMAIL
+                            to_email: 'benmostafa1010@gmail.com', 
                             user_email: userEmail,
                             user_ip: userIP,
                             user_location: locationInfo,
@@ -1126,9 +1161,21 @@
                 }
             }
 
-            showAuthModal() {
+            async showAuthModal() {
                 const existingModal = document.getElementById('authModal');
                 if (existingModal) return;
+
+                // Check if device is blocked before showing auth modal
+                try {
+                    const deviceFingerprint = await generateDeviceFingerprint();
+                    const blockedDevices = JSON.parse(localStorage.getItem('blockedDevices') || '[]');
+                    if (blockedDevices.includes(deviceFingerprint)) {
+                        this.showBlockedDeviceMessage();
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error checking device fingerprint:', error);
+                }
 
                 const modal = document.createElement('div');
                 modal.id = 'authModal';
@@ -1174,6 +1221,48 @@
                 
                 // Animate in
                 setTimeout(() => modal.classList.add('show'), 10);
+            }
+            showBlockedDeviceMessage() {
+                const existingModal = document.getElementById('blockedModal');
+                if (existingModal) return;
+
+                const modal = document.createElement('div');
+                modal.id = 'blockedModal';
+                modal.className = 'auth-modal show';
+                modal.innerHTML = `
+                    <div class="auth-modal-content">
+                        <div class="auth-header">
+                            <h2 style="color: #ff6b6b;">🚫 Access Blocked</h2>
+                            <p>This device has been blocked from accessing Mo Cloud</p>
+                        </div>
+                        
+                        <div style="text-align: center; padding: 2rem;">
+                            <i class="fas fa-ban" style="font-size: 4rem; color: #ff6b6b; margin-bottom: 1rem;"></i>
+                            <p style="color: var(--text-color); font-size: var(--normal-font-size); margin-bottom: 1rem;">
+                                Your device has been permanently blocked from creating accounts or signing in to Mo Cloud.
+                            </p>
+                            <p style="color: var(--text-color-light); font-size: var(--small-font-size);">
+                                If you believe this is an error, please contact the administrator.
+                            </p>
+                        </div>
+                        
+                        <div style="text-align: center; padding-top: 1rem;">
+                            <button onclick="document.getElementById('blockedModal').remove()" style="
+                                background: var(--surface-color);
+                                color: var(--text-color);
+                                border: 1px solid rgba(255, 215, 0, 0.2);
+                                padding: 0.75rem 1.5rem;
+                                border-radius: 0.5rem;
+                                cursor: pointer;
+                                font-weight: var(--font-medium);
+                            ">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(modal);
             }
 
             hideAuthModal() {
@@ -3190,6 +3279,69 @@
         window.authManager = new AuthManager();
         window.fileManager = new FileManager();
     </script>
+    
+    <script>
+        // Device Fingerprinting Functions
+        async function generateDeviceFingerprint() {
+                try {
+                    const basicFingerprint = {
+                        userAgent: navigator.userAgent,
+                        language: navigator.language,
+                        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                        screen: `${screen.width}x${screen.height}x${screen.colorDepth}`,
+                        platform: navigator.platform,
+                        cores: navigator.hardwareConcurrency || 0,
+                        touch: navigator.maxTouchPoints || 0
+                    };
+                    
+                    const canvasFingerprint = getCanvasFingerprint();
+                    const webglFingerprint = getWebGLFingerprint();
+                    
+                    const combined = JSON.stringify({
+                        basic: basicFingerprint,
+                        canvas: canvasFingerprint,
+                        webgl: webglFingerprint
+                    });
+                    
+                    const encoder = new TextEncoder();
+                    const data = encoder.encode(combined);
+                    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                    const hashArray = Array.from(new Uint8Array(hashBuffer));
+                    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                } catch (error) {
+                    console.error('Error generating fingerprint:', error);
+                    return 'fallback_' + Date.now() + '_' + Math.random().toString(36);
+                }
+            }
+
+            function getCanvasFingerprint() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    ctx.textBaseline = 'top';
+                    ctx.font = '14px Arial';
+                    ctx.fillText('Device fingerprint test 🔒', 2, 2);
+                    return canvas.toDataURL();
+                } catch (error) {
+                    return 'canvas_unavailable';
+                }
+            }
+
+            function getWebGLFingerprint() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                    if (!gl) return 'webgl_unavailable';
+                    
+                    const vendor = gl.getParameter(gl.VENDOR) || 'unknown';
+                    const renderer = gl.getParameter(gl.RENDERER) || 'unknown';
+                    return { vendor, renderer };
+                } catch (error) {
+                    return 'webgl_error';
+                }
+            }
+
+    </script>
 
     <script>
         // DOM Event Handlers
@@ -3298,7 +3450,7 @@
                         }
                     } else {
                         // If not signed in, manually show auth modal
-                        window.authManager.showAuthModal();
+                        await window.authManager.showAuthModal();
                     }
                 });
             }
@@ -3353,6 +3505,37 @@
                             
                         </div>
                         
+                        <div style="margin-bottom: 2rem;">
+                            <h3 style="color: var(--title-color); margin-bottom: 1rem; font-size: var(--h3-font-size);">User Management</h3>
+                            
+                            <button id="manageUsersBtn" style="
+                                background: linear-gradient(135deg, var(--accent-blue), #5BA0F2);
+                                color: white;
+                                border: none;
+                                padding: 0.75rem 1.5rem;
+                                border-radius: 0.5rem;
+                                cursor: pointer;
+                                font-weight: var(--font-medium);
+                                margin-right: 1rem;
+                                margin-bottom: 0.5rem;
+                            ">
+                                <i class="fas fa-users"></i> Manage Users
+                            </button>
+                            
+                            <button id="viewBlockedBtn" style="
+                                background: linear-gradient(135deg, #ff6b6b, #ff8c8c);
+                                color: white;
+                                border: none;
+                                padding: 0.75rem 1.5rem;
+                                border-radius: 0.5rem;
+                                cursor: pointer;
+                                font-weight: var(--font-medium);
+                                margin-bottom: 0.5rem;
+                            ">
+                                <i class="fas fa-ban"></i> View Blocked
+                            </button>
+                        </div>
+
                         <div style="margin-bottom: 2rem;">
                             <h3 style="color: var(--title-color); margin-bottom: 1rem; font-size: var(--h3-font-size);">Cache Management</h3>
                             
@@ -3503,6 +3686,18 @@
                     }
                 });
 
+                // Manage Users
+                const manageUsersBtn = modal.querySelector('#manageUsersBtn');
+                const viewBlockedBtn = modal.querySelector('#viewBlockedBtn');
+
+                manageUsersBtn.addEventListener('click', () => {
+                    showUserManagementModal();
+                });
+
+                viewBlockedBtn.addEventListener('click', () => {
+                    showBlockedUsersModal();
+                });
+
                 // Load existing settings
                 loadAdminSettings(modal);
             }
@@ -3525,6 +3720,451 @@
                     }
                 }
             }
+
+            // User Management Modal
+            async function showUserManagementModal() {
+                const existingModal = document.getElementById('userManagementModal');
+                if (existingModal) existingModal.remove();
+
+                const modal = document.createElement('div');
+                modal.id = 'userManagementModal';
+                modal.className = 'auth-modal show';
+                modal.innerHTML = `
+                    <div class="auth-modal-content" style="max-width: 800px; max-height: 80vh;">
+                        <div class="auth-header">
+                            <h2>User Management</h2>
+                            <p>Manage all registered users</p>
+                        </div>
+                        
+                        <div style="max-height: 400px; overflow-y: auto; margin-bottom: 2rem;">
+                            <div id="usersList" style="padding: 1rem;">
+                                <div class="loading" style="text-align: center; padding: 2rem;">
+                                    <div class="spinner" style="margin: 0 auto 1rem;"></div>
+                                    <p style="color: var(--text-color);">Loading users...</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: center;">
+                            <button id="closeUserManagement" style="
+                                background: var(--surface-color);
+                                color: var(--text-color);
+                                border: 1px solid rgba(255, 215, 0, 0.2);
+                                padding: 0.75rem 1.5rem;
+                                border-radius: 0.5rem;
+                                cursor: pointer;
+                                font-weight: var(--font-medium);
+                            ">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(modal);
+
+                // Load users
+                await loadAllUsers();
+
+                // Close button
+                modal.querySelector('#closeUserManagement').addEventListener('click', () => {
+                    modal.classList.remove('show');
+                    setTimeout(() => modal.remove(), 300);
+                });
+            }
+
+            async function loadAllUsers() {
+                try {
+                    // Add these imports at the beginning of the function
+                    const { collection, query, getDocs, where } = await import('https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js');
+
+                    const usersList = document.getElementById('usersList');
+                    
+                    // Get all files to group by user
+                    const filesQuery = query(collection(window.db, 'files'));
+                    const filesSnapshot = await getDocs(filesQuery);
+                    
+                    const userStats = {};
+                    filesSnapshot.forEach(doc => {
+                        const file = doc.data();
+                        if (!userStats[file.userId]) {
+                            userStats[file.userId] = {
+                                fileCount: 0,
+                                totalSize: 0,
+                                files: []
+                            };
+                        }
+                        userStats[file.userId].fileCount++;
+                        userStats[file.userId].totalSize += file.size || 0;
+                        userStats[file.userId].files.push({...file, id: doc.id});
+                    });
+
+                    // Get user details from Firebase Auth (we'll store some info in Firestore)
+                    const usersQuery = query(collection(window.db, 'users'));
+                    const usersSnapshot = await getDocs(usersQuery);
+                    
+                    const users = [];
+                    usersSnapshot.forEach(doc => {
+                        users.push({id: doc.id, ...doc.data()});
+                    });
+
+                    if (users.length === 0) {
+                        usersList.innerHTML = `
+                            <div style="text-align: center; padding: 2rem; color: var(--text-color-light);">
+                                No users found. User data is stored when they first upload a file.
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    usersList.innerHTML = users.map(user => {
+                        const stats = userStats[user.userId] || { fileCount: 0, totalSize: 0 };
+                        return `
+                            <div style="
+                                background: linear-gradient(135deg, var(--midnight-dark), var(--midnight-medium));
+                                border: 1px solid rgba(255, 215, 0, 0.1);
+                                border-radius: 0.5rem;
+                                padding: 1rem;
+                                margin-bottom: 1rem;
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                            ">
+                                <div style="flex: 1;">
+                                    <div style="color: var(--title-color); font-weight: var(--font-medium); margin-bottom: 0.25rem;">
+                                        📧 ${user.email}
+                                    </div>
+                                    <div style="color: var(--text-color-light); font-size: var(--small-font-size);">
+                                        🖥️ Device: ${user.deviceInfo || 'Unknown'}<br>
+                                        📁 Files: ${stats.fileCount} | 💾 Size: ${formatFileSize(stats.totalSize)}<br>
+                                        📅 Joined: ${user.signupDate ? new Date(user.signupDate).toLocaleDateString() : 'Unknown'}
+                                    </div>
+                                </div>
+                                <button onclick="confirmDeleteUser('${user.userId}', '${user.email}')" style="
+                                    background: linear-gradient(135deg, #ff6b6b, #ff8c8c);
+                                    color: white;
+                                    border: none;
+                                    padding: 0.5rem 1rem;
+                                    border-radius: 0.25rem;
+                                    cursor: pointer;
+                                    font-weight: var(--font-medium);
+                                ">
+                                    🗑️ Delete User
+                                </button>
+                            </div>
+                        `;
+                    }).join('');
+
+                } catch (error) {
+                    console.error('Error loading users:', error);
+                    document.getElementById('usersList').innerHTML = `
+                        <div style="text-align: center; padding: 2rem; color: #ff6b6b;">
+                            Error loading users: ${error.message}
+                        </div>
+                    `;
+                }
+            }
+
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+            }
+
+            async function confirmDeleteUser(userId, email) {
+                const confirmed = confirm(`Are you sure you want to delete user "${email}"?\n\nThis will:\n- Delete their account\n- Delete ALL their files\n- Block their email and device\n\nThis action cannot be undone!`);
+                
+                if (confirmed) {
+                    await deleteUserCompletely(userId, email);
+                }
+            }
+
+            async function deleteUserCompletely(userId, email) {
+                try {
+                    console.log(`Deleting user: ${email}`);
+                    
+                    // Get user's device fingerprint and files
+                    const userQuery = query(collection(window.db, 'users'), where('userId', '==', userId));
+                    const userSnapshot = await getDocs(userQuery);
+                    
+                    let deviceFingerprint = null;
+                    userSnapshot.forEach(doc => {
+                        deviceFingerprint = doc.data().deviceFingerprint;
+                    });
+
+                    // Delete user's files from Storage and Firestore
+                    const filesQuery = query(collection(window.db, 'files'), where('userId', '==', userId));
+                    const filesSnapshot = await getDocs(filesQuery);
+                    
+                    const deletePromises = [];
+                    filesSnapshot.forEach(doc => {
+                        const file = doc.data();
+                        // Delete from Storage
+                        if (window.fileManager && window.fileManager.storageManager) {
+                            deletePromises.push(window.fileManager.storageManager.deleteFile(file.storagePath));
+                        }
+                        // Delete from Firestore
+                        deletePromises.push(deleteDoc(doc.ref));
+                    });
+                    
+                    await Promise.all(deletePromises);
+
+                    // Delete user document
+                    userSnapshot.forEach(doc => {
+                        deleteDoc(doc.ref);
+                    });
+
+                    // Add to blocked lists
+                    const blockedEmails = JSON.parse(localStorage.getItem('blockedEmails') || '[]');
+                    const blockedDevices = JSON.parse(localStorage.getItem('blockedDevices') || '[]');
+                    
+                    if (!blockedEmails.includes(email)) {
+                        blockedEmails.push(email);
+                        localStorage.setItem('blockedEmails', JSON.stringify(blockedEmails));
+                    }
+                    
+                    if (deviceFingerprint && !blockedDevices.includes(deviceFingerprint)) {
+                        blockedDevices.push(deviceFingerprint);
+                        localStorage.setItem('blockedDevices', JSON.stringify(blockedDevices));
+                    }
+
+                    alert(`User "${email}" has been completely deleted and blocked.`);
+                    
+                    // Refresh the users list
+                    await loadAllUsers();
+                    
+                    // Refresh file manager if needed
+                    if (window.fileManager) {
+                        await window.fileManager.loadFiles();
+                    }
+                    
+                } catch (error) {
+                    console.error('Error deleting user:', error);
+                    alert(`Error deleting user: ${error.message}`);
+                }
+            }
+
+            // Blocked Users Modal
+            function showBlockedUsersModal() {
+                const existingModal = document.getElementById('blockedUsersModal');
+                if (existingModal) existingModal.remove();
+
+                const modal = document.createElement('div');
+                modal.id = 'blockedUsersModal';
+                modal.className = 'auth-modal show';
+                modal.innerHTML = `
+                    <div class="auth-modal-content" style="max-width: 800px;">
+                        <div class="auth-header">
+                            <h2>Blocked Users</h2>
+                            <p>Manage blocked users - each block includes both email and device</p>
+                        </div>
+                        
+                        <div style="margin-bottom: 2rem;">
+                            <div id="blockedUsersList" style="max-height: 400px; overflow-y: auto;">
+                                <!-- Blocked users will load here -->
+                            </div>
+                        </div>
+                        
+                        <div style="text-align: center;">
+                            <button id="closeBlockedUsers" style="
+                                background: var(--surface-color);
+                                color: var(--text-color);
+                                border: 1px solid rgba(255, 215, 0, 0.2);
+                                padding: 0.75rem 1.5rem;
+                                border-radius: 0.5rem;
+                                cursor: pointer;
+                                font-weight: var(--font-medium);
+                            ">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(modal);
+                loadBlockedUsers();
+
+                modal.querySelector('#closeBlockedUsers').addEventListener('click', () => {
+                    modal.classList.remove('show');
+                    setTimeout(() => modal.remove(), 300);
+                });
+            }
+
+            function loadBlockedUsers() {
+                const blockedEmails = JSON.parse(localStorage.getItem('blockedEmails') || '[]');
+                const blockedDevices = JSON.parse(localStorage.getItem('blockedDevices') || '[]');
+                const blockedAssociations = JSON.parse(localStorage.getItem('blockedAssociations') || '{}');
+                
+                const usersList = document.getElementById('blockedUsersList');
+                
+                // Create a unified list of blocked users
+                const blockedUsers = new Map();
+                
+                // Add email-based blocks
+                blockedEmails.forEach(email => {
+                    const deviceForEmail = Object.keys(blockedAssociations).find(device => 
+                        blockedAssociations[device] === email
+                    );
+                    
+                    blockedUsers.set(email, {
+                        email: email,
+                        device: deviceForEmail || null,
+                        hasEmailBlock: true,
+                        hasDeviceBlock: deviceForEmail ? blockedDevices.includes(deviceForEmail) : false
+                    });
+                });
+                
+                // Add device-only blocks (devices without associated emails)
+                blockedDevices.forEach(device => {
+                    const associatedEmail = blockedAssociations[device];
+                    if (!associatedEmail || !blockedEmails.includes(associatedEmail)) {
+                        // This is a device-only block
+                        blockedUsers.set(device, {
+                            email: associatedEmail || 'Unknown',
+                            device: device,
+                            hasEmailBlock: associatedEmail ? blockedEmails.includes(associatedEmail) : false,
+                            hasDeviceBlock: true
+                        });
+                    }
+                });
+                
+                if (blockedUsers.size === 0) {
+                    usersList.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-color-light);">No blocked users</div>';
+                    return;
+                }
+                
+                usersList.innerHTML = Array.from(blockedUsers.entries()).map(([key, user]) => {
+                    const identifier = user.email !== 'Unknown' ? user.email : key;
+                    
+                    return `
+                        <div style="
+                            background: linear-gradient(135deg, var(--midnight-dark), var(--midnight-medium));
+                            border: 1px solid rgba(255, 107, 107, 0.3);
+                            border-radius: 0.5rem;
+                            padding: 1.5rem;
+                            margin-bottom: 1rem;
+                        ">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                                <div style="flex: 1;">
+                                    <div style="color: var(--title-color); font-weight: var(--font-semibold); font-size: var(--normal-font-size); margin-bottom: 0.5rem;">
+                                        🚫 Blocked User
+                                    </div>
+                                    
+                                    <div style="margin-bottom: 0.5rem;">
+                                        <span style="color: var(--text-color); font-size: var(--small-font-size);">📧 Email:</span>
+                                        <span style="color: ${user.hasEmailBlock ? '#ff6b6b' : 'var(--text-color-light)'}; margin-left: 0.5rem; ${user.hasEmailBlock ? 'font-weight: var(--font-medium);' : ''}">
+                                            ${user.email} ${user.hasEmailBlock ? '(BLOCKED)' : '(not blocked)'}
+                                        </span>
+                                    </div>
+                                    
+                                    <div style="margin-bottom: 1rem;">
+                                        <span style="color: var(--text-color); font-size: var(--small-font-size);">🖥️ Device:</span>
+                                        <span style="color: ${user.hasDeviceBlock ? '#ff6b6b' : 'var(--text-color-light)'}; margin-left: 0.5rem; font-family: monospace; font-size: var(--smaller-font-size); ${user.hasDeviceBlock ? 'font-weight: var(--font-medium);' : ''}">
+                                            ${user.device ? user.device.substring(0, 24) + '...' : 'Not tracked'} ${user.hasDeviceBlock ? '(BLOCKED)' : '(not blocked)'}
+                                        </span>
+                                    </div>
+                                    
+                                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                        ${user.hasEmailBlock ? `
+                                            <button onclick="unblockSpecific('email', '${user.email}')" style="
+                                                background: linear-gradient(135deg, var(--accent-teal), #1DD1A1);
+                                                color: white;
+                                                border: none;
+                                                padding: 0.5rem 1rem;
+                                                border-radius: 0.25rem;
+                                                cursor: pointer;
+                                                font-size: var(--small-font-size);
+                                                font-weight: var(--font-medium);
+                                            ">
+                                                🔓 Unblock Email
+                                            </button>
+                                        ` : ''}
+                                        
+                                        ${user.hasDeviceBlock && user.device ? `
+                                            <button onclick="unblockSpecific('device', '${user.device}')" style="
+                                                background: linear-gradient(135deg, var(--accent-blue), #5BA0F2);
+                                                color: white;
+                                                border: none;
+                                                padding: 0.5rem 1rem;
+                                                border-radius: 0.25rem;
+                                                cursor: pointer;
+                                                font-size: var(--small-font-size);
+                                                font-weight: var(--font-medium);
+                                            ">
+                                                🔓 Unblock Device
+                                            </button>
+                                        ` : ''}
+                                        
+                                        ${(user.hasEmailBlock && user.hasDeviceBlock && user.device) ? `
+                                            <button onclick="unblockSpecific('both', '${user.email}', '${user.device}')" style="
+                                                background: linear-gradient(135deg, var(--primary-gold), var(--gold-light));
+                                                color: var(--midnight-deep);
+                                                border: none;
+                                                padding: 0.5rem 1rem;
+                                                border-radius: 0.25rem;
+                                                cursor: pointer;
+                                                font-size: var(--small-font-size);
+                                                font-weight: var(--font-medium);
+                                            ">
+                                                🔓 Unblock Both
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            function unblockSpecific(type, emailOrDevice, device = null) {
+                const blockedEmails = JSON.parse(localStorage.getItem('blockedEmails') || '[]');
+                const blockedDevices = JSON.parse(localStorage.getItem('blockedDevices') || '[]');
+                const blockedAssociations = JSON.parse(localStorage.getItem('blockedAssociations') || '{}');
+                
+                let message = '';
+                
+                if (type === 'email') {
+                    // Unblock email only
+                    const updatedEmails = blockedEmails.filter(e => e !== emailOrDevice);
+                    localStorage.setItem('blockedEmails', JSON.stringify(updatedEmails));
+                    message = `Email "${emailOrDevice}" has been unblocked. Device remains blocked.`;
+                    
+                } else if (type === 'device') {
+                    // Unblock device only
+                    const updatedDevices = blockedDevices.filter(d => d !== emailOrDevice);
+                    localStorage.setItem('blockedDevices', JSON.stringify(updatedDevices));
+                    
+                    // Remove association for this device
+                    const updatedAssociations = {...blockedAssociations};
+                    delete updatedAssociations[emailOrDevice];
+                    localStorage.setItem('blockedAssociations', JSON.stringify(updatedAssociations));
+                    
+                    message = `Device has been unblocked. Email remains blocked.`;
+                    
+                } else if (type === 'both') {
+                    // Unblock both email and device
+                    const updatedEmails = blockedEmails.filter(e => e !== emailOrDevice);
+                    const updatedDevices = blockedDevices.filter(d => d !== device);
+                    
+                    localStorage.setItem('blockedEmails', JSON.stringify(updatedEmails));
+                    localStorage.setItem('blockedDevices', JSON.stringify(updatedDevices));
+                    
+                    // Remove association
+                    const updatedAssociations = {...blockedAssociations};
+                    delete updatedAssociations[device];
+                    localStorage.setItem('blockedAssociations', JSON.stringify(updatedAssociations));
+                    
+                    message = `Both email "${emailOrDevice}" and device have been completely unblocked.`;
+                }
+                
+                alert(message);
+                loadBlockedUsers();
+            }
+
+
         });
 
         // File Upload Handler
